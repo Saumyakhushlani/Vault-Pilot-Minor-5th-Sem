@@ -39,7 +39,15 @@ const stepCounter = document.getElementById('step-counter') as HTMLElement;
 const tabButtons = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
 const tabContents = document.querySelectorAll<HTMLElement>('.tab-content');
 
-// Chat Tab
+// Onboarding Banner
+const onboardingBanner = document.getElementById('onboarding-banner') as HTMLElement | null;
+const bannerTitle = document.getElementById('banner-title') as HTMLElement | null;
+const bannerDesc = document.getElementById('banner-desc') as HTMLElement | null;
+const btnBannerSettings = document.getElementById('btn-banner-settings') as HTMLButtonElement | null;
+const btnBannerVault = document.getElementById('btn-banner-vault') as HTMLButtonElement | null;
+
+// Chat Tab Elements
+const btnAutofillHero = document.getElementById('btn-autofill-current-page') as HTMLButtonElement | null;
 const commandForm = document.getElementById('command-form') as HTMLFormElement;
 const commandInput = document.getElementById('command-input') as HTMLTextAreaElement;
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement;
@@ -60,19 +68,21 @@ const btnClearLogs = document.getElementById('btn-clear-logs') as HTMLButtonElem
 const btnSaveWorkflow = document.getElementById('btn-save-as-workflow') as HTMLButtonElement;
 const pinnedTemplatesList = document.getElementById('pinned-templates-list') as HTMLElement;
 
-// Workflows Tab
+// Workflows Tab Elements
 const workflowsList = document.getElementById('workflows-list') as HTMLElement;
 const allTemplatesList = document.getElementById('all-templates-list') as HTMLElement;
 
-// Vault Tab
+// Vault Tab Elements
 const vaultForm = document.getElementById('vault-form') as HTMLFormElement;
+const btnFillDemoVault = document.getElementById('btn-fill-demo-vault') as HTMLButtonElement | null;
 const btnExportData = document.getElementById('btn-export-data') as HTMLButtonElement;
 const btnWipeData = document.getElementById('btn-wipe-data') as HTMLButtonElement;
 
-// Settings Tab
+// Settings Tab Elements
 const settingsForm = document.getElementById('settings-form') as HTMLFormElement;
 const sApiKey = document.getElementById('s-apikey') as HTMLInputElement;
 const btnToggleApiKey = document.getElementById('btn-toggle-apikey') as HTMLButtonElement;
+const btnTestApiKey = document.getElementById('btn-test-apikey') as HTMLButtonElement | null;
 const sModel = document.getElementById('s-model') as HTMLSelectElement;
 const sDryRun = document.getElementById('s-dryrun') as HTMLInputElement;
 const sMaxSteps = document.getElementById('s-maxsteps') as HTMLInputElement;
@@ -83,8 +93,6 @@ const auditLogView = document.getElementById('audit-log-view') as HTMLElement;
 // Runtime Port Connection
 let port: chrome.runtime.Port | null = null;
 let lastRecordedSteps: WorkflowRecordedStep[] = [];
-
-// Speech Recognition Instance
 let recognition: unknown = null;
 
 function connectPort(): void {
@@ -154,7 +162,7 @@ function handleIncomingEvent(type: string, data: unknown): void {
       const res = data as { stepsCount: number; recordedSteps: WorkflowRecordedStep[] };
       lastRecordedSteps = res.recordedSteps || [];
       if (lastRecordedSteps.length > 0) {
-        btnSaveWorkflow.style.display = 'inline-block';
+        btnSaveWorkflow.style.display = 'inline-flex';
       }
       break;
     }
@@ -257,39 +265,73 @@ function escapeHtml(text: string): string {
 }
 
 // ==========================================
-// 2. Tab Navigation
+// 2. Tab Navigation & Onboarding Status
 // ==========================================
+
+function switchTab(targetTabId: string): void {
+  tabButtons.forEach((b) => b.classList.remove('active'));
+  tabContents.forEach((c) => c.classList.remove('active'));
+
+  const activeBtn = document.querySelector<HTMLButtonElement>(`[data-tab="${targetTabId}"]`);
+  const activeContent = document.getElementById(targetTabId);
+
+  activeBtn?.classList.add('active');
+  activeContent?.classList.add('active');
+
+  if (targetTabId === 'tab-workflows') {
+    renderWorkflowsTab();
+  } else if (targetTabId === 'tab-settings') {
+    renderAuditLogs();
+  }
+}
 
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     const targetTabId = btn.getAttribute('data-tab');
-    if (!targetTabId) return;
-
-    tabButtons.forEach((b) => b.classList.remove('active'));
-    tabContents.forEach((c) => c.classList.remove('active'));
-
-    btn.classList.add('active');
-    document.getElementById(targetTabId)?.classList.add('active');
-
-    if (targetTabId === 'tab-workflows') {
-      renderWorkflowsTab();
-    } else if (targetTabId === 'tab-settings') {
-      renderAuditLogs();
+    if (targetTabId) {
+      switchTab(targetTabId);
     }
   });
 });
+
+async function checkOnboardingStatus(): Promise<void> {
+  if (!onboardingBanner) return;
+  const settings = await loadSettingsFromStorage();
+  const profile = await getProfile();
+
+  const hasKey = Boolean(settings.geminiApiKey && settings.geminiApiKey.trim());
+  const hasProfile = Boolean(profile.fullName && profile.fullName.trim());
+
+  if (!hasKey) {
+    onboardingBanner.style.display = 'flex';
+    if (bannerTitle) bannerTitle.textContent = 'Step 1: Set Your Gemini API Key';
+    if (bannerDesc) bannerDesc.textContent = 'Add your free Google Gemini API key in Settings to activate form filling.';
+  } else if (!hasProfile) {
+    onboardingBanner.style.display = 'flex';
+    if (bannerTitle) bannerTitle.textContent = 'Step 2: Save Your Details in Profile Vault';
+    if (bannerDesc) bannerDesc.textContent = 'Enter your details once in Profile Vault so VaultPilot can autofill any form.';
+  } else {
+    onboardingBanner.style.display = 'none';
+  }
+}
+
+if (btnBannerSettings) {
+  btnBannerSettings.addEventListener('click', () => switchTab('tab-settings'));
+}
+
+if (btnBannerVault) {
+  btnBannerVault.addEventListener('click', () => switchTab('tab-vault'));
+}
 
 // ==========================================
 // 3. User Controls & Form Submissions
 // ==========================================
 
-commandForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const command = commandInput.value.trim();
-  if (!command) return;
+function triggerCommandRun(command: string): void {
+  if (!command.trim()) return;
 
   btnSaveWorkflow.style.display = 'none';
-  chrome.runtime.sendMessage({ type: 'START_RUN', command }, (res) => {
+  chrome.runtime.sendMessage({ type: 'START_RUN', command: command.trim() }, (res) => {
     if (!res?.success) {
       appendLog({
         id: `err_${Date.now()}`,
@@ -299,7 +341,23 @@ commandForm.addEventListener('submit', (e) => {
       });
     }
   });
+}
 
+// 1-Click Hero Autofill Button
+if (btnAutofillHero) {
+  btnAutofillHero.addEventListener('click', () => {
+    const defaultCommand = 'Fill this application form using my saved profile';
+    commandInput.value = defaultCommand;
+    triggerCommandRun(defaultCommand);
+  });
+}
+
+commandForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const command = commandInput.value.trim();
+  if (!command) return;
+
+  triggerCommandRun(command);
   commandInput.value = '';
 });
 
@@ -329,7 +387,7 @@ questionInput.addEventListener('keydown', (e) => {
 });
 
 btnClearLogs.addEventListener('click', () => {
-  logList.innerHTML = '<div class="log-empty">Logs cleared.</div>';
+  logList.innerHTML = '<div class="log-empty">Activity log cleared.</div>';
 });
 
 // Execution mode toggle
@@ -346,7 +404,7 @@ modeSelect.addEventListener('change', async () => {
   });
 });
 
-// Speech Recognition for Voice Commands (FR-16)
+// Speech Recognition for Voice Commands
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   const SpeechRec = (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition ||
     (window as unknown as { webkitSpeechRecognition?: any }).webkitSpeechRecognition;
@@ -355,29 +413,29 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   const r = recognition as any;
   r.continuous = false;
   r.interimResults = false;
-  r.lang = 'en-IN'; // Indian English / Hindi-friendly
+  r.lang = 'en-IN';
 
   r.onresult = (event: any) => {
     const transcript = event.results[0][0].transcript;
     commandInput.value = transcript;
-    btnMic.style.color = '';
+    btnMic.classList.remove('active');
   };
 
   r.onerror = () => {
-    btnMic.style.color = '';
+    btnMic.classList.remove('active');
   };
 
   r.onend = () => {
-    btnMic.style.color = '';
+    btnMic.classList.remove('active');
   };
 
   btnMic.addEventListener('click', () => {
     try {
-      btnMic.style.color = '#ef4444';
+      btnMic.classList.add('active');
       r.start();
     } catch {
       r.stop();
-      btnMic.style.color = '';
+      btnMic.classList.remove('active');
     }
   });
 } else {
@@ -409,17 +467,23 @@ async function renderWorkflowsTab(): Promise<void> {
 
   if (workflows.length === 0) {
     workflowsList.innerHTML =
-      '<div class="empty-state">No saved workflows yet. Complete a form run to save it as a workflow.</div>';
+      '<div class="empty-state">No saved workflows yet. Complete a form run and click "Save Workflow".</div>';
   } else {
     for (const wf of workflows) {
       const card = document.createElement('div');
       card.className = 'workflow-card';
       card.innerHTML = `
         <div class="wf-header">
-          <span class="wf-title">${escapeHtml(wf.name)}</span>
+          <span class="wf-title font-medium">${escapeHtml(wf.name)}</span>
           <div class="wf-actions">
-            <button class="btn btn-primary btn-xs btn-replay" data-id="${wf.id}">⚡ Replay</button>
-            <button class="btn btn-danger-outline btn-xs btn-delete" data-id="${wf.id}">Delete</button>
+            <button class="btn btn-primary btn-xs btn-replay" data-id="${wf.id}">
+              <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Replay
+            </button>
+            <button class="btn btn-danger-outline btn-xs btn-delete" data-id="${wf.id}">
+              <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Delete
+            </button>
           </div>
         </div>
         <div class="wf-meta">${escapeHtml(wf.domain)} • ${wf.steps.length} steps</div>
@@ -431,7 +495,7 @@ async function renderWorkflowsTab(): Promise<void> {
       b.addEventListener('click', () => {
         const id = b.getAttribute('data-id');
         if (id) {
-          document.querySelector<HTMLButtonElement>('[data-tab="tab-chat"]')?.click();
+          switchTab('tab-chat');
           chrome.runtime.sendMessage({ type: 'REPLAY_WORKFLOW', workflowId: id });
         }
       });
@@ -457,8 +521,11 @@ async function renderWorkflowsTab(): Promise<void> {
     card.className = 'template-card';
     card.innerHTML = `
       <div class="wf-header">
-        <span class="wf-title">${escapeHtml(t.title)}</span>
-        <button class="btn btn-outline btn-xs btn-use-template" data-prompt="${escapeHtml(t.prompt)}">Use</button>
+        <span class="wf-title font-medium">${escapeHtml(t.title)}</span>
+        <button class="btn btn-outline btn-xs btn-use-template" data-prompt="${escapeHtml(t.prompt)}">
+          <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>
+          Use
+        </button>
       </div>
       <div class="wf-meta">${escapeHtml(t.prompt)}</div>
     `;
@@ -470,7 +537,7 @@ async function renderWorkflowsTab(): Promise<void> {
       const p = b.getAttribute('data-prompt');
       if (p) {
         commandInput.value = p;
-        document.querySelector<HTMLButtonElement>('[data-tab="tab-chat"]')?.click();
+        switchTab('tab-chat');
         commandInput.focus();
       }
     });
@@ -524,6 +591,33 @@ async function loadProfileIntoForm(): Promise<void> {
   (document.getElementById('v-pan') as HTMLInputElement).value = p.pan || '';
 }
 
+// 1-Click Fill Demo Profile
+if (btnFillDemoVault) {
+  btnFillDemoVault.addEventListener('click', () => {
+    (document.getElementById('v-fullname') as HTMLInputElement).value = 'Saumya Khushlani';
+    (document.getElementById('v-dob') as HTMLInputElement).value = '2004-05-15';
+    (document.getElementById('v-gender') as HTMLSelectElement).value = 'Male';
+    (document.getElementById('v-category') as HTMLSelectElement).value = 'General';
+    (document.getElementById('v-father') as HTMLInputElement).value = 'Ramesh Khushlani';
+    (document.getElementById('v-mother') as HTMLInputElement).value = 'Anita Khushlani';
+    (document.getElementById('v-email') as HTMLInputElement).value = 'saumya@example.com';
+    (document.getElementById('v-phone') as HTMLInputElement).value = '9876543210';
+    (document.getElementById('v-address') as HTMLInputElement).value = 'MANIT Campus, Link Road No. 3';
+    (document.getElementById('v-city') as HTMLInputElement).value = 'Bhopal';
+    (document.getElementById('v-state') as HTMLInputElement).value = 'Madhya Pradesh';
+    (document.getElementById('v-pincode') as HTMLInputElement).value = '462003';
+    (document.getElementById('v-college') as HTMLInputElement).value = 'Maulana Azad National Institute of Technology Bhopal';
+    (document.getElementById('v-rollno') as HTMLInputElement).value = '24112011148';
+    (document.getElementById('v-degree') as HTMLInputElement).value = 'B.Tech';
+    (document.getElementById('v-branch') as HTMLInputElement).value = 'Computer Science & Engineering';
+    (document.getElementById('v-cgpa') as HTMLInputElement).value = '8.75';
+    (document.getElementById('v-aadhaar') as HTMLInputElement).value = '234567890128';
+    (document.getElementById('v-pan') as HTMLInputElement).value = 'ABCDE1234F';
+
+    alert('Demo student profile loaded into form! Click "Save Profile" below to persist.');
+  });
+}
+
 vaultForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const profile: UserProfile = {
@@ -549,6 +643,7 @@ vaultForm.addEventListener('submit', async (e) => {
   };
 
   await saveProfile(profile);
+  await checkOnboardingStatus();
   alert('Profile Vault updated! Real personal details will be substituted directly at DOM execution time.');
 });
 
@@ -568,6 +663,7 @@ btnWipeData.addEventListener('click', async () => {
     await wipeAllData();
     await loadProfileIntoForm();
     await loadSettingsIntoForm();
+    await checkOnboardingStatus();
     alert('All data has been completely erased from extension storage.');
   }
 });
@@ -610,6 +706,34 @@ btnToggleApiKey.addEventListener('click', () => {
   }
 });
 
+if (btnTestApiKey) {
+  btnTestApiKey.addEventListener('click', () => {
+    const apiKey = sApiKey.value.trim();
+    if (!apiKey) {
+      alert('Please enter your Gemini API key first.');
+      sApiKey.focus();
+      return;
+    }
+
+    btnTestApiKey.textContent = 'Testing...';
+    chrome.runtime.sendMessage(
+      {
+        type: 'TEST_API_KEY',
+        apiKey,
+        modelName: sModel.value || 'gemini-1.5-flash',
+      },
+      (res) => {
+        btnTestApiKey.textContent = 'Test Key';
+        if (res?.success) {
+          alert('API key test succeeded! Your Gemini key is valid and connected.');
+        } else {
+          alert(`API key test failed: ${res?.error || 'Unknown error'}`);
+        }
+      }
+    );
+  });
+}
+
 settingsForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const settings: ExtensionSettings = {
@@ -626,6 +750,7 @@ settingsForm.addEventListener('submit', async (e) => {
   };
 
   await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings });
+  await checkOnboardingStatus();
   alert('Settings saved successfully!');
 });
 
@@ -635,18 +760,18 @@ async function renderAuditLogs(): Promise<void> {
   auditLogView.innerHTML = '';
 
   if (logs.length === 0) {
-    auditLogView.innerHTML = '<div class="text-muted text-sm">No PII was sent to the model yet.</div>';
+    auditLogView.innerHTML = '<div class="text-ink-muted text-xs text-center py-4">No PII was sent to the model yet.</div>';
     return;
   }
 
   const recent = logs.slice(-15).reverse();
   for (const entry of recent) {
     const div = document.createElement('div');
-    div.className = 'audit-entry';
+    div.className = 'audit-entry py-1 text-xs border-b border-border-subtle flex justify-between';
     const date = new Date(entry.timestamp).toLocaleTimeString();
     div.innerHTML = `
-      <span>${date} [${escapeHtml(entry.feature)}]</span>
-      <span style="color:#4ade80;">Masked: ${entry.maskedCount} item(s)</span>
+      <span class="text-ink-secondary">${date} [${escapeHtml(entry.feature)}]</span>
+      <span class="text-emerald-600 font-medium">Masked: ${entry.maskedCount} item(s)</span>
     `;
     auditLogView.appendChild(div);
   }
@@ -656,3 +781,4 @@ async function renderAuditLogs(): Promise<void> {
 loadProfileIntoForm();
 loadSettingsIntoForm();
 renderPinnedTemplates();
+checkOnboardingStatus();

@@ -2,6 +2,7 @@ import { AgentLoop } from './agent-loop';
 import { getProfile } from '../shared/vault';
 import { getSavedWorkflows } from '../shared/workflow-manager';
 import { Workflow, WorkflowRecordedStep } from '../shared/types';
+import { streamGemini } from './llm-client';
 
 if (chrome.sidePanel?.setPanelBehavior) {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
@@ -112,6 +113,30 @@ async function handleMessage(
 
     case 'GET_RECORDED_STEPS': {
       sendResponse({ success: true, data: agentLoop.getRecordedSteps() });
+      break;
+    }
+
+    case 'TEST_API_KEY': {
+      const apiKey = (message.apiKey as string) || '';
+      const model = (message.modelName as string) || 'gemini-1.5-flash';
+      try {
+        let ok = false;
+        for await (const chunk of streamGemini({
+          apiKey,
+          model,
+          systemPrompt: 'Respond with short JSON: {"status":"ok"}',
+          userPrompt: 'ping',
+        })) {
+          if (chunk) {
+            ok = true;
+            break;
+          }
+        }
+        sendResponse({ success: ok, message: ok ? 'API key validated successfully!' : 'No response from model' });
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        sendResponse({ success: false, error: errorMsg });
+      }
       break;
     }
 
