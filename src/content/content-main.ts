@@ -17,6 +17,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   switch (message.type) {
+    case 'PING': {
+      sendResponse({ success: true, active: true });
+      return true;
+    }
+
     case 'SCAN_PAGE': {
       try {
         const scanResult = scanPage();

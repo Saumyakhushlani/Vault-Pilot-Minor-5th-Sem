@@ -298,11 +298,92 @@ export class AgentLoop {
     };
   }
 
+  private async ensureContentScriptInjected(tabId: number): Promise<void> {
+    const isResponsive = await new Promise<boolean>((resolve) => {
+      chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
+        if (chrome.runtime.lastError || !response?.success) {
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
+    });
+
+    if (isResponsive) {
+      return;
+    }
+
+    let tab: chrome.tabs.Tab | null = null;
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch {
+      // Tab might not be accessible
+    }
+
+    const url = tab?.url || '';
+
+    if (
+      url.startsWith('chrome://') ||
+      url.startsWith('chrome-extension://') ||
+      url.startsWith('edge://') ||
+      url.startsWith('about:') ||
+      url.startsWith('view-source:')
+    ) {
+      throw new Error(
+        'VaultPilot cannot automate internal browser pages (chrome://). Please navigate to an actual form or application portal.'
+      );
+    }
+
+    if (url.startsWith('file://')) {
+      const isAllowed = await new Promise<boolean>((resolve) => {
+        if (typeof chrome !== 'undefined' && chrome.extension?.isAllowedFileSchemeAccess) {
+          chrome.extension.isAllowedFileSchemeAccess((allowed) => resolve(allowed));
+        } else {
+          resolve(true);
+        }
+      });
+
+      if (!isAllowed) {
+        throw new Error(
+          'Chrome is blocking access to local file URLs. To allow testing on local HTML files: Go to chrome://extensions -> Click "Details" on VaultPilot -> Turn ON "Allow access to file URLs" -> Refresh this tab (F5).'
+        );
+      }
+    }
+
+    try {
+      const manifest = chrome.runtime.getManifest();
+      const contentScripts = manifest.content_scripts?.[0]?.js || [];
+      if (contentScripts.length > 0 && typeof chrome !== 'undefined' && chrome.scripting?.executeScript) {
+        await chrome.scripting.executeScript({
+          target: { tabId, allFrames: true },
+          files: contentScripts,
+        });
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    } catch (err: unknown) {
+      console.warn('[VaultPilot] Script injection attempt:', err);
+      throw new Error(
+        'Could not connect to the webpage. Please refresh this page (press F5 or click reload) and try again.'
+      );
+    }
+  }
+
   private async scanTab(tabId: number): Promise<ScanResult> {
+    await this.ensureContentScriptInjected(tabId);
+
     return new Promise((resolve, reject) => {
       chrome.tabs.sendMessage(tabId, { type: 'SCAN_PAGE' }, (response) => {
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          const raw = chrome.runtime.lastError.message || '';
+          if (raw.includes('Receiving end does not exist') || raw.includes('Could not establish connection')) {
+            reject(
+              new Error(
+                'Could not connect to the webpage. Please refresh this page (press F5 or click reload) and try again.'
+              )
+            );
+          } else {
+            reject(new Error(raw));
+          }
         } else if (response?.success) {
           resolve(response.data);
         } else {
@@ -343,7 +424,11 @@ export class AgentLoop {
         },
         (response) => {
           if (chrome.runtime.lastError) {
-            resolve({ success: false, error: chrome.runtime.lastError.message });
+            const raw = chrome.runtime.lastError.message || '';
+            const friendly = (raw.includes('Receiving end does not exist') || raw.includes('Could not establish connection'))
+              ? 'Webpage connection was lost. Please refresh the page (F5) and try again.'
+              : raw;
+            resolve({ success: false, error: friendly });
           } else if (response?.success && response.results?.[0]?.success) {
             resolve({ success: true });
           } else {
