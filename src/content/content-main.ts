@@ -7,11 +7,18 @@ import {
   executeSingleAction,
   ActionResult,
 } from './executor';
-import { AgentAction, UserProfile, WorkflowRecordedStep } from '../shared/types';
+import { AgentAction, UserProfile, WorkflowRecordedStep, PortalCredential } from '../shared/types';
 
-console.log('[VaultPilot] Content script active.');
+// Top-level frame invariant:
+// VaultPilot page automation, DOM scanning, and execution must run exclusively on the top-level window.
+// Embedded subframes (such as Google reCAPTCHA, Cloudflare challenges, or third-party ads)
+// must never intercept page-level automation messages.
+if (typeof window !== 'undefined' && window !== window.top) {
+  // Gracefully exit subframes
+} else {
+  console.log('[VaultPilot] Content script active on top window.');
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message.type !== 'string') {
     return false;
   }
@@ -36,8 +43,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'EXECUTE_ACTIONS': {
       const actions: AgentAction[] = message.actions || [];
       const profile: UserProfile = message.profile || {};
+      const portalCred: PortalCredential | null = message.portalCred || null;
 
-      executeActionBatch(actions, profile)
+      executeActionBatch(actions, profile, portalCred)
         .then((results) => {
           sendResponse({ success: true, results });
         })
@@ -137,3 +145,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return false;
   }
 });
+
+}

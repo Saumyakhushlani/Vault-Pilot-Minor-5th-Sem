@@ -118,7 +118,10 @@ async function handleMessage(
 
     case 'TEST_API_KEY': {
       const apiKey = (message.apiKey as string) || '';
-      const model = (message.modelName as string) || 'gemini-1.5-flash';
+      let model = (message.modelName as string) || 'gemini-3.8-flash';
+      if (model === 'gemini-2.0-flash' || model === 'gemini-2.0-flash-exp') {
+        model = 'gemini-3.8-flash';
+      }
       try {
         let ok = false;
         for await (const chunk of streamGemini({
@@ -172,6 +175,7 @@ async function handleMessage(
             steps: target.steps,
             profile,
           },
+          { frameId: 0 },
           (res) => {
             if (chrome.runtime.lastError) {
               sendResponse({ success: false, error: chrome.runtime.lastError.message });

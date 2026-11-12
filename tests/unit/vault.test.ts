@@ -7,6 +7,11 @@ import {
   saveProfile,
   getProfile,
   SETTINGS_STORAGE_KEY,
+  findUnresolvedTokens,
+  savePortalCredential,
+  getPortalCredential,
+  listPortalCredentials,
+  deletePortalCredential,
 } from '../../src/shared/vault';
 import { UserProfile } from '../../src/shared/types';
 
@@ -127,6 +132,51 @@ describe('Profile Vault - Storage, Export & Sanitization', () => {
     const exportedJson = await exportAllData();
     expect(exportedJson).not.toContain('AIzaSySecretApiKeyShouldBeRedacted');
     expect(exportedJson).toContain('gemini-2.0-flash');
+  });
+
+
+  it('identifies unresolved tokens accurately with findUnresolvedTokens', () => {
+    const text = 'Submit {profile.aadhaar} and {profile.pan} with login {portal.username}';
+    const unresolved = findUnresolvedTokens(text);
+
+    expect(unresolved).toContain('{profile.aadhaar}');
+    expect(unresolved).toContain('{profile.pan}');
+    expect(unresolved).toContain('{portal.username}');
+    expect(unresolved.length).toBe(3);
+  });
+
+  it('substitutes portal credentials into portal tokens', () => {
+    const template = 'User: {portal.username}, Pass: {portal.password}';
+    const result = substituteProfileValues(template, {}, {
+      domain: 'erp.college.ac.in',
+      username: '24112011148',
+      password: 'mypassword123',
+      updatedAt: Date.now(),
+    });
+
+    expect(result).toBe('User: 24112011148, Pass: mypassword123');
+  });
+
+  it('saves, retrieves, lists, and deletes portal credentials per domain', async () => {
+    await savePortalCredential({
+      domain: 'erp.manit.ac.in',
+      username: 'scholar2024',
+      password: 'collegePass!',
+      updatedAt: Date.now(),
+    });
+
+    const retrieved = await getPortalCredential('erp.manit.ac.in');
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.username).toBe('scholar2024');
+    expect(retrieved?.password).toBe('collegePass!');
+
+    const list = await listPortalCredentials();
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.some((c) => c.domain === 'erp.manit.ac.in')).toBe(true);
+
+    await deletePortalCredential('erp.manit.ac.in');
+    const afterDelete = await getPortalCredential('erp.manit.ac.in');
+    expect(afterDelete).toBeNull();
   });
 
   it('completely erases all data on wipeAllData()', async () => {

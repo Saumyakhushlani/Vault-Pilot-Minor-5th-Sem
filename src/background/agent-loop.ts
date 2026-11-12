@@ -1,8 +1,10 @@
 import { sendToModel } from '../shared/gateway';
 import { evaluateActionSafety, isDomainAllowed } from '../shared/safety-gate';
-import { getProfile, SETTINGS_STORAGE_KEY } from '../shared/vault';
+import { getProfile, saveProfile, getPortalCredential, savePortalCredential, findUnresolvedTokens, TOKEN_KEY_MAP, substituteProfileValues, SETTINGS_STORAGE_KEY } from '../shared/vault';
+import { extractCredentialsFromCommand, humanizeToken } from '../shared/credential-extractor';
 import {
   ActionSafetyEvaluation,
+  PortalCredential,
   AgentAction,
   AgentResponse,
   AgentRunState,
@@ -29,6 +31,7 @@ export class AgentLoop {
   private pendingConfirmationResolver: ((approved: boolean) => void) | null = null;
   private pendingQuestionResolver: ((answer: string) => void) | null = null;
   private logs: LogItem[] = [];
+  private activePortalCred: PortalCredential | null = null;
 
   constructor(onEvent: EventCallback) {
     this.onEvent = onEvent;
@@ -120,6 +123,20 @@ export class AgentLoop {
     this.addLog('info', `Starting task: "${command}"`);
     this.onEvent('STATUS_UPDATE', this.getStatus());
 
+    const credExtraction = extractCredentialsFromCommand(command);
+    let llmCommand = credExtraction.sanitizedCommand;
+    if (credExtraction.hasCredentials) {
+      this.activePortalCred = {
+        domain: '',
+        username: credExtraction.username || '',
+        password: credExtraction.password || '',
+        updatedAt: Date.now(),
+      };
+      this.addLog('info', 'Credentials detected in prompt: password masked locally (zero LLM leak).');
+    } else {
+      this.activePortalCred = null;
+    }
+
     try {
       const settings = await this.loadSettings();
       this.maxSteps = settings.maxSteps || 15;
@@ -154,12 +171,29 @@ export class AgentLoop {
           scanResult.elements.map((el) => [el.id, el])
         );
 
+        if (this.activePortalCred) {
+          this.activePortalCred.domain = scanResult.domain;
+          await savePortalCredential(this.activePortalCred);
+        } else {
+          this.activePortalCred = await getPortalCredential(scanResult.domain);
+          if (this.activePortalCred?.username) {
+            this.addLog('info', `Loaded saved portal credentials for ${scanResult.domain}.`);
+          }
+        }
+
         this.addLog('info', 'Analyzing page with Gemini (PII Shield active)...');
         let currentThoughtText = '';
 
-        const modelResponse: AgentResponse = await sendToModel(
+        // Heartbeat interval to keep Chrome extension service worker alive during network calls
+        const heartbeat = setInterval(() => {
+          this.onEvent('HEARTBEAT', { step: this.currentStep });
+        }, 4000);
+
+        let modelResponse: AgentResponse;
+        try {
+          modelResponse = await sendToModel(
           {
-            command: this.currentCommand,
+            command: llmCommand,
             pageTitle: scanResult.title,
             pageUrl: scanResult.url,
             elements: scanResult.elements,
@@ -167,7 +201,7 @@ export class AgentLoop {
           { feature: 'agent_loop' },
           {
             apiKey: settings.geminiApiKey,
-            modelName: settings.modelName,
+            modelName: (settings.modelName && !settings.modelName.includes('2.0') && !settings.modelName.includes('2.5')) ? settings.modelName : 'gemini-3.5-flash',
             signal: this.abortController.signal,
           },
           (token: string) => {
@@ -175,16 +209,24 @@ export class AgentLoop {
             this.onEvent('STREAM_CHUNK', { token, currentThought: currentThoughtText });
           }
         );
+        } finally {
+          clearInterval(heartbeat);
+        }
 
-        this.addLog('thought', modelResponse.thought);
-        this.onEvent('STEP_THOUGHT', { thought: modelResponse.thought });
+        if (modelResponse.thought) {
+          this.addLog('thought', modelResponse.thought);
+          this.onEvent('STEP_THOUGHT', { thought: modelResponse.thought });
+        }
+
+        const actionCount = modelResponse.actions?.length || 0;
+        this.addLog('info', `Plan received: ${actionCount} action(s) to execute.`);
 
         if (!modelResponse.actions || modelResponse.actions.length === 0) {
           if (modelResponse.status === 'done') {
             this.addLog('success', 'Task marked as completed by model.');
             break;
           }
-          this.addLog('warning', 'Model planned no actions. Halting loop.');
+          this.addLog('warning', 'Model found no applicable inputs to autofill.');
           break;
         }
 
@@ -196,6 +238,35 @@ export class AgentLoop {
           if (action.type === 'ask_user') {
             await this.promptUserQuestion(action);
             continue;
+          }
+
+          if (action.type === 'type') {
+            const unresolvedTokens = findUnresolvedTokens(action.value);
+            for (const token of unresolvedTokens) {
+              if (token.startsWith('{profile.')) {
+                const cleanKey = token.replace(/[{}]/g, '').toLowerCase();
+                const prop = TOKEN_KEY_MAP[cleanKey];
+                const label = humanizeToken(token);
+
+                this.addLog('info', `Form requires "${label}" which is not in your Profile Vault.`);
+                const answer = await this.promptUserQuestion({
+                  type: 'ask_user',
+                  question: `Your "${label}" is required to fill this form. Please enter it:`,
+                });
+
+                if (answer && answer.trim()) {
+                  if (prop) {
+                    (userProfile as any)[prop] = answer.trim();
+                  } else {
+                    if (!userProfile.customFields) userProfile.customFields = {};
+                    userProfile.customFields[cleanKey.replace('profile.', '')] = answer.trim();
+                  }
+                  await saveProfile(userProfile);
+                  this.addLog('success', `Saved "${label}" to Profile Vault!`);
+                }
+              }
+            }
+            action.value = substituteProfileValues(action.value, userProfile, this.activePortalCred);
           }
 
           const safetyEval: ActionSafetyEvaluation = evaluateActionSafety(
@@ -224,7 +295,7 @@ export class AgentLoop {
           }
 
           this.addLog('action', `Executing: ${action.type}${('id' in action) ? ` on element #${action.id}` : ''}`);
-          const execRes = await this.executeActionOnTab(tabId, action, userProfile);
+          const execRes = await this.executeActionOnTab(tabId, action, userProfile, this.activePortalCred);
 
           if (!execRes.success) {
             this.addLog('error', `Action failed: ${execRes.error || 'Unknown execution failure'}`);
@@ -239,6 +310,10 @@ export class AgentLoop {
             tag: targetEl?.tag,
             value: ('value' in action) ? action.value : undefined,
           });
+
+          if (action.type === 'click') {
+            await this.waitForPageReadiness(tabId);
+          }
         }
 
         if (modelResponse.status === 'done') {
@@ -279,7 +354,7 @@ export class AgentLoop {
       const saved = res[SETTINGS_STORAGE_KEY] || {};
       return {
         geminiApiKey: saved.geminiApiKey || '',
-        modelName: saved.modelName || 'gemini-1.5-flash',
+        modelName: saved.modelName || 'gemini-3.5-flash',
         executionMode: saved.executionMode || 'autopilot',
         dryRun: Boolean(saved.dryRun),
         maxSteps: saved.maxSteps || 15,
@@ -289,7 +364,7 @@ export class AgentLoop {
     }
     return {
       geminiApiKey: '',
-      modelName: 'gemini-1.5-flash',
+      modelName: 'gemini-3.5-flash',
       executionMode: 'autopilot',
       dryRun: false,
       maxSteps: 15,
@@ -300,7 +375,7 @@ export class AgentLoop {
 
   private async ensureContentScriptInjected(tabId: number): Promise<void> {
     const isResponsive = await new Promise<boolean>((resolve) => {
-      chrome.tabs.sendMessage(tabId, { type: 'PING' }, (response) => {
+      chrome.tabs.sendMessage(tabId, { type: 'PING' }, { frameId: 0 }, (response) => {
         if (chrome.runtime.lastError || !response?.success) {
           resolve(false);
         } else {
@@ -355,7 +430,7 @@ export class AgentLoop {
       const contentScripts = manifest.content_scripts?.[0]?.js || [];
       if (contentScripts.length > 0 && typeof chrome !== 'undefined' && chrome.scripting?.executeScript) {
         await chrome.scripting.executeScript({
-          target: { tabId, allFrames: true },
+          target: { tabId },
           files: contentScripts,
         });
         await new Promise((r) => setTimeout(r, 150));
@@ -372,7 +447,7 @@ export class AgentLoop {
     await this.ensureContentScriptInjected(tabId);
 
     return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, { type: 'SCAN_PAGE' }, (response) => {
+      chrome.tabs.sendMessage(tabId, { type: 'SCAN_PAGE' }, { frameId: 0 }, (response) => {
         if (chrome.runtime.lastError) {
           const raw = chrome.runtime.lastError.message || '';
           if (raw.includes('Receiving end does not exist') || raw.includes('Could not establish connection')) {
@@ -395,15 +470,37 @@ export class AgentLoop {
 
   private async highlightTabElement(tabId: number, elementId: number): Promise<void> {
     try {
-      chrome.tabs.sendMessage(tabId, { type: 'HIGHLIGHT_ELEMENT', id: elementId }, () => {});
+      chrome.tabs.sendMessage(tabId, { type: 'HIGHLIGHT_ELEMENT', id: elementId }, { frameId: 0 }, () => {});
     } catch {
       // Ignore
     }
   }
 
+  private async waitForPageReadiness(tabId: number, timeoutMs = 20000): Promise<void> {
+    const start = Date.now();
+    await new Promise((r) => setTimeout(r, 500));
+
+    while (Date.now() - start < timeoutMs && this.isRunning) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.status === 'complete') {
+          const responsive = await new Promise<boolean>((resolve) => {
+            chrome.tabs.sendMessage(tabId, { type: 'PING' }, { frameId: 0 }, (response) => {
+              resolve(Boolean(response?.success));
+            });
+          });
+          if (responsive) break;
+        }
+      } catch {
+        // Tab navigating
+      }
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+
   private async clearTabHighlights(tabId: number): Promise<void> {
     try {
-      chrome.tabs.sendMessage(tabId, { type: 'CLEAR_HIGHLIGHTS' }, () => {});
+      chrome.tabs.sendMessage(tabId, { type: 'CLEAR_HIGHLIGHTS' }, { frameId: 0 }, () => {});
     } catch {
       // Ignore
     }
@@ -412,7 +509,8 @@ export class AgentLoop {
   private async executeActionOnTab(
     tabId: number,
     action: AgentAction,
-    profile: UserProfile
+    profile: UserProfile,
+    portalCred?: PortalCredential | null
   ): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       chrome.tabs.sendMessage(
@@ -421,7 +519,9 @@ export class AgentLoop {
           type: 'EXECUTE_ACTIONS',
           actions: [action],
           profile,
+          portalCred,
         },
+        { frameId: 0 },
         (response) => {
           if (chrome.runtime.lastError) {
             const raw = chrome.runtime.lastError.message || '';

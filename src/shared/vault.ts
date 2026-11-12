@@ -1,9 +1,10 @@
-import { UserProfile } from './types';
+import { UserProfile, PortalCredential } from './types';
 
 export const PROFILE_STORAGE_KEY = 'vp_user_profile';
 export const SETTINGS_STORAGE_KEY = 'vp_settings';
 export const WORKFLOWS_STORAGE_KEY = 'vp_workflows';
 export const AUDIT_STORAGE_KEY = 'vp_audit_logs';
+export const PORTAL_CREDENTIALS_STORAGE_KEY = 'vp_portal_credentials';
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   fullName: '',
@@ -31,7 +32,7 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   customFields: {},
 };
 
-const TOKEN_KEY_MAP: Record<string, keyof UserProfile> = {
+export const TOKEN_KEY_MAP: Record<string, keyof UserProfile> = {
   'profile.full_name': 'fullName',
   'profile.fullname': 'fullName',
   'profile.name': 'fullName',
@@ -78,13 +79,66 @@ export async function getProfile(): Promise<UserProfile> {
   return { ...DEFAULT_USER_PROFILE };
 }
 
+
+export async function getPortalCredential(domain: string): Promise<PortalCredential | null> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const res = await chrome.storage.local.get(PORTAL_CREDENTIALS_STORAGE_KEY);
+    const map = (res[PORTAL_CREDENTIALS_STORAGE_KEY] as Record<string, PortalCredential>) || {};
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    return map[cleanDomain] || null;
+  }
+  return null;
+}
+
+export async function savePortalCredential(credential: PortalCredential): Promise<void> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const res = await chrome.storage.local.get(PORTAL_CREDENTIALS_STORAGE_KEY);
+    const map = (res[PORTAL_CREDENTIALS_STORAGE_KEY] as Record<string, PortalCredential>) || {};
+    const cleanDomain = credential.domain.toLowerCase().replace(/^www\./, '').trim();
+    map[cleanDomain] = {
+      ...credential,
+      domain: cleanDomain,
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({ [PORTAL_CREDENTIALS_STORAGE_KEY]: map });
+  }
+}
+
+export async function listPortalCredentials(): Promise<PortalCredential[]> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const res = await chrome.storage.local.get(PORTAL_CREDENTIALS_STORAGE_KEY);
+    const map = (res[PORTAL_CREDENTIALS_STORAGE_KEY] as Record<string, PortalCredential>) || {};
+    return Object.values(map);
+  }
+  return [];
+}
+
+export async function deletePortalCredential(domain: string): Promise<void> {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    const res = await chrome.storage.local.get(PORTAL_CREDENTIALS_STORAGE_KEY);
+    const map = (res[PORTAL_CREDENTIALS_STORAGE_KEY] as Record<string, PortalCredential>) || {};
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    delete map[cleanDomain];
+    await chrome.storage.local.set({ [PORTAL_CREDENTIALS_STORAGE_KEY]: map });
+  }
+}
+
+export function findUnresolvedTokens(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  const matches = text.match(/\{(profile\.[a-zA-Z0-9_.-]+|portal\.[a-zA-Z0-9_.-]+)\}/g);
+  return matches ? Array.from(new Set(matches)) : [];
+}
+
 export async function saveProfile(profile: UserProfile): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await chrome.storage.local.set({ [PROFILE_STORAGE_KEY]: profile });
   }
 }
 
-export function getAvailableProfileTokens(profile?: UserProfile): string[] {
+export function getAvailableProfileTokens(
+  profile?: UserProfile,
+  portalCred?: PortalCredential | null
+): string[] {
   const tokens = Object.keys(TOKEN_KEY_MAP).map((k) => `{${k}}`);
 
   if (profile?.customFields) {
@@ -93,13 +147,28 @@ export function getAvailableProfileTokens(profile?: UserProfile): string[] {
     }
   }
 
+  if (portalCred) {
+    tokens.push('{portal.username}', '{portal.password}', '{portal.id}');
+  }
+
   return Array.from(new Set(tokens));
 }
 
-export function substituteProfileValues(text: string, profile: UserProfile): string {
+export function substituteProfileValues(
+  text: string,
+  profile: UserProfile,
+  portalCred?: PortalCredential | null
+): string {
   if (!text || typeof text !== 'string') return text;
 
-  return text.replace(/\{profile\.([a-zA-Z0-9_.-]+)\}/g, (match, fieldName) => {
+  let result = text;
+
+  if (portalCred) {
+    result = result.replace(/\{portal\.(username|user|id)\}/gi, portalCred.username || '');
+    result = result.replace(/\{portal\.(password|pass|pwd)\}/gi, portalCred.password || '');
+  }
+
+  result = result.replace(/\{profile\.([a-zA-Z0-9_.-]+)\}/g, (match, fieldName) => {
     const fullKey = `profile.${fieldName}`.toLowerCase();
 
     if (fullKey in TOKEN_KEY_MAP) {
@@ -126,6 +195,8 @@ export function substituteProfileValues(text: string, profile: UserProfile): str
 
     return match;
   });
+
+  return result;
 }
 
 export async function exportAllData(): Promise<string> {

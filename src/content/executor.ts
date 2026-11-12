@@ -1,4 +1,4 @@
-import { AgentAction, UserProfile } from '../shared/types';
+import { AgentAction, UserProfile, PortalCredential } from '../shared/types';
 import { substituteProfileValues } from '../shared/vault';
 
 const HIGHLIGHT_OVERLAY_ID = 'vp-active-highlight-overlay';
@@ -89,7 +89,8 @@ export interface ActionResult {
 
 export async function executeSingleAction(
   action: AgentAction,
-  profile: UserProfile = {}
+  profile: UserProfile = {},
+  portalCred?: PortalCredential | null
 ): Promise<ActionResult> {
   try {
     switch (action.type) {
@@ -99,7 +100,8 @@ export async function executeSingleAction(
           return { success: false, action, error: `Element with id ${action.id} not found` };
         }
 
-        const resolvedValue = substituteProfileValues(action.value, profile);
+        let resolvedValue = substituteProfileValues(action.value, profile, portalCred);
+        resolvedValue = resolvedValue.replace(/\{(?:profile|portal)\.[a-zA-Z0-9_.-]+\}/g, '');
 
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         highlightElement(el);
@@ -150,7 +152,8 @@ export async function executeSingleAction(
           return { success: false, action, error: `Element with id ${action.id} not found` };
         }
 
-        const resolvedValue = substituteProfileValues(action.value, profile);
+        let resolvedValue = substituteProfileValues(action.value, profile, portalCred);
+        resolvedValue = resolvedValue.replace(/\{(?:profile|portal)\.[a-zA-Z0-9_.-]+\}/g, '');
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         highlightElement(el);
 
@@ -232,12 +235,13 @@ export async function executeSingleAction(
 
 export async function executeActionBatch(
   actions: AgentAction[],
-  profile: UserProfile = {}
+  profile: UserProfile = {},
+  portalCred?: PortalCredential | null
 ): Promise<ActionResult[]> {
   const results: ActionResult[] = [];
 
   for (const act of actions) {
-    const res = await executeSingleAction(act, profile);
+    const res = await executeSingleAction(act, profile, portalCred);
     results.push(res);
     if (!res.success) {
       break;

@@ -19,9 +19,12 @@ import {
   saveProfile,
   exportAllData,
   wipeAllData,
+  listPortalCredentials,
+  deletePortalCredential,
   SETTINGS_STORAGE_KEY,
   AUDIT_STORAGE_KEY,
 } from '../shared/vault';
+import { setupAllCustomControls } from './custom-components';
 import {
   getSavedWorkflows,
   saveWorkflow,
@@ -89,6 +92,9 @@ const sMaxSteps = document.getElementById('s-maxsteps') as HTMLInputElement;
 const sAllowList = document.getElementById('s-allowlist') as HTMLTextAreaElement;
 const sLang = document.getElementById('s-lang') as HTMLSelectElement;
 const auditLogView = document.getElementById('audit-log-view') as HTMLElement;
+
+// Custom UI Controls Controller
+let customControls: { syncAll: () => void; syncDob: () => void } | null = null;
 
 // Runtime Port Connection
 let port: chrome.runtime.Port | null = null;
@@ -282,6 +288,8 @@ function switchTab(targetTabId: string): void {
     renderWorkflowsTab();
   } else if (targetTabId === 'tab-settings') {
     renderAuditLogs();
+  } else if (targetTabId === 'tab-vault') {
+    renderPortalCredentials();
   }
 }
 
@@ -568,6 +576,64 @@ async function renderPinnedTemplates(): Promise<void> {
 // 5. Profile Vault Management
 // ==========================================
 
+
+async function renderPortalCredentials(): Promise<void> {
+  const container = document.getElementById('portal-credentials-list');
+  if (!container) return;
+
+  const creds = await listPortalCredentials();
+  if (creds.length === 0) {
+    container.innerHTML = '<div class="text-xs text-muted" style="color: #64748b; font-size: 11px;">No portal logins saved yet. Use chat (e.g. "my id is ... and pass is ...") to save automatically.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for (const c of creds) {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.justifyContent = 'space-between';
+    row.style.padding = '6px 10px';
+    row.style.backgroundColor = '#ffffff';
+    row.style.borderRadius = '6px';
+    row.style.border = '1px solid #e2e8f0';
+
+    const info = document.createElement('div');
+    info.style.display = 'flex';
+    info.style.flexDirection = 'column';
+    info.style.gap = '2px';
+
+    const domainSpan = document.createElement('span');
+    domainSpan.style.fontWeight = '600';
+    domainSpan.style.fontSize = '12px';
+    domainSpan.style.color = '#1e293b';
+    domainSpan.textContent = c.domain;
+
+    const userSpan = document.createElement('span');
+    userSpan.style.fontSize = '11px';
+    userSpan.style.color = '#64748b';
+    userSpan.textContent = `User: ${c.username} • Pass: ••••••••`;
+
+    info.appendChild(domainSpan);
+    info.appendChild(userSpan);
+
+    const btnDelete = document.createElement('button');
+    btnDelete.type = 'button';
+    btnDelete.className = 'btn btn-text btn-xs';
+    btnDelete.style.color = '#ef4444';
+    btnDelete.style.padding = '4px 6px';
+    btnDelete.textContent = 'Remove';
+    btnDelete.addEventListener('click', async () => {
+      await deletePortalCredential(c.domain);
+      await renderPortalCredentials();
+    });
+
+    row.appendChild(info);
+    row.appendChild(btnDelete);
+    container.appendChild(row);
+  }
+}
+
 async function loadProfileIntoForm(): Promise<void> {
   const p = await getProfile();
   (document.getElementById('v-fullname') as HTMLInputElement).value = p.fullName || '';
@@ -589,6 +655,7 @@ async function loadProfileIntoForm(): Promise<void> {
   (document.getElementById('v-cgpa') as HTMLInputElement).value = p.cgpa || '';
   (document.getElementById('v-aadhaar') as HTMLInputElement).value = p.aadhaar || '';
   (document.getElementById('v-pan') as HTMLInputElement).value = p.pan || '';
+  customControls?.syncAll();
 }
 
 // 1-Click Fill Demo Profile
@@ -613,6 +680,7 @@ if (btnFillDemoVault) {
     (document.getElementById('v-cgpa') as HTMLInputElement).value = '8.75';
     (document.getElementById('v-aadhaar') as HTMLInputElement).value = '234567890128';
     (document.getElementById('v-pan') as HTMLInputElement).value = 'ABCDE1234F';
+    customControls?.syncAll();
 
     alert('Demo student profile loaded into form! Click "Save Profile" below to persist.');
   });
@@ -662,6 +730,7 @@ btnWipeData.addEventListener('click', async () => {
   if (confirm('Are you sure you want to wipe ALL stored data (profile, API keys, workflows)? This cannot be undone.')) {
     await wipeAllData();
     await loadProfileIntoForm();
+renderPortalCredentials();
     await loadSettingsIntoForm();
     await checkOnboardingStatus();
     alert('All data has been completely erased from extension storage.');
@@ -676,7 +745,7 @@ async function loadSettingsFromStorage(): Promise<ExtensionSettings> {
   const res = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
   return res[SETTINGS_STORAGE_KEY] || {
     geminiApiKey: '',
-    modelName: 'gemini-1.5-flash',
+    modelName: 'gemini-3.5-flash',
     executionMode: 'autopilot',
     dryRun: false,
     maxSteps: 15,
@@ -688,12 +757,17 @@ async function loadSettingsFromStorage(): Promise<ExtensionSettings> {
 async function loadSettingsIntoForm(): Promise<void> {
   const s = await loadSettingsFromStorage();
   sApiKey.value = s.geminiApiKey || '';
-  sModel.value = s.modelName || 'gemini-1.5-flash';
+  let modelVal = s.modelName || 'gemini-3.5-flash';
+  if (modelVal.includes('2.0') || modelVal.includes('2.5') || modelVal === 'gemini-1.5-flash') {
+    modelVal = 'gemini-3.5-flash';
+  }
+  sModel.value = modelVal;
   sDryRun.checked = Boolean(s.dryRun);
   sMaxSteps.value = String(s.maxSteps || 15);
   sAllowList.value = (s.domainAllowList || []).join('\n');
   sLang.value = s.language || 'en';
   modeSelect.value = s.executionMode || 'autopilot';
+  customControls?.syncAll();
 }
 
 btnToggleApiKey.addEventListener('click', () => {
@@ -720,7 +794,7 @@ if (btnTestApiKey) {
       {
         type: 'TEST_API_KEY',
         apiKey,
-        modelName: sModel.value || 'gemini-1.5-flash',
+        modelName: sModel.value || 'gemini-3.8-flash',
       },
       (res) => {
         btnTestApiKey.textContent = 'Test Key';
@@ -778,6 +852,7 @@ async function renderAuditLogs(): Promise<void> {
 }
 
 // Initial Bootstrap
+customControls = setupAllCustomControls();
 loadProfileIntoForm();
 loadSettingsIntoForm();
 renderPinnedTemplates();

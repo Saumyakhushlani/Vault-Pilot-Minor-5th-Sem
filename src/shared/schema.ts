@@ -63,7 +63,12 @@ export function validateAction(action: unknown, index: number): { valid: true; a
     return { valid: false, error: `Action[${index}] missing string "type"` };
   }
 
-  switch (act.type) {
+  let actType = (act.type as string).toLowerCase().trim();
+  if (actType === 'input') {
+    actType = 'type';
+  }
+
+  switch (actType) {
     case 'type': {
       if (typeof act.id !== 'number' || !Number.isInteger(act.id) || act.id < 0) {
         return { valid: false, error: `Action[${index}] (type) requires positive integer "id"` };
@@ -109,13 +114,11 @@ export function validateAction(action: unknown, index: number): { valid: true; a
       if (typeof act.id !== 'number' || !Number.isInteger(act.id) || act.id < 0) {
         return { valid: false, error: `Action[${index}] (check) requires positive integer "id"` };
       }
-      if (typeof act.checked !== 'boolean') {
-        return { valid: false, error: `Action[${index}] (check) requires boolean "checked"` };
-      }
+      const checkedVal = act.checked !== undefined ? Boolean(act.checked) : (act.value !== undefined ? String(act.value).toLowerCase() === 'true' : true);
       const checkAction: CheckAction = {
         type: 'check',
         id: act.id,
-        checked: act.checked,
+        checked: checkedVal,
       };
       return { valid: true, action: checkAction };
     }

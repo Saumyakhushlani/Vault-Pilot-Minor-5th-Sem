@@ -141,6 +141,14 @@ export interface ActionSafetyEvaluation {
   elementTag?: string;
 }
 
+export interface PortalCredential {
+  domain: string;
+  username: string;
+  password?: string;
+  portalName?: string;
+  updatedAt: number;
+}
+
 export interface UserProfile {
   fullName?: string;
   firstName?: string;

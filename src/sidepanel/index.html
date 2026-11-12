@@ -6,52 +6,47 @@
   <title>VaultPilot</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-canvas text-ink-base font-sans antialiased select-none">
-  <div id="app" class="flex flex-col h-screen p-3 bg-canvas overflow-hidden">
+<body>
+  <div id="app">
     <!-- Header -->
-    <header class="app-header flex items-center justify-between pb-2.5 border-b border-border-soft">
-      <div class="brand flex items-center gap-2">
-        <div class="logo-icon flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="m9 12 2 2 4-4"/>
-          </svg>
-        </div>
+    <header class="app-header">
+      <div class="brand">
+        <img src="/icons/icon32.png" alt="VaultPilot Logo" class="brand-icon" />
         <div class="brand-text">
-          <div class="flex items-center gap-1.5">
-            <h1 class="text-sm font-semibold tracking-tight text-ink-base leading-tight">VaultPilot</h1>
-            <span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Local AI</span>
+          <div class="brand-title-row">
+            <h1>VaultPilot</h1>
+            <span class="badge-local-ai">Local AI</span>
           </div>
-          <span class="sub-text text-[11px] text-ink-muted">Privacy-first form assistant</span>
+          <span class="brand-sub">Privacy-first form assistant</span>
         </div>
       </div>
-      <div class="header-actions flex items-center gap-2">
+      <div class="header-actions">
         <div id="status-badge" class="badge badge-idle">Ready</div>
         <button id="btn-emergency-stop" class="btn btn-danger btn-xs" title="Emergency Stop" style="display: none;">
-          <svg class="w-3 h-3 fill-current mr-1" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
           Stop
         </button>
       </div>
     </header>
 
     <!-- Top Mode & Steps Bar -->
-    <div class="controls-bar flex items-center justify-between py-1.5 mt-0.5 text-xs">
-      <div class="mode-toggle-group flex items-center gap-1.5">
-        <label for="mode-select" class="mode-label text-[11px] font-medium text-ink-secondary">Mode:</label>
-        <select id="mode-select" class="select-sm">
+    <div class="controls-bar">
+      <div class="mode-toggle-group">
+        <label for="mode-select" class="mode-label">Mode:</label>
+        <select id="mode-select">
           <option value="autopilot">Smart Autopilot (Automatic)</option>
           <option value="step-by-step">Step-by-Step (Manual Confirm)</option>
         </select>
       </div>
       <div class="quick-status">
-        <span id="step-counter" class="text-[11px] text-ink-muted font-medium bg-surface-subtle px-2 py-0.5 rounded border border-border-soft">0/15 steps</span>
+        <span id="step-counter" class="step-counter-pill">0/15 steps</span>
       </div>
     </div>
 
     <!-- Navigation Tabs -->
-    <nav class="nav-tabs flex gap-1 p-1 mt-1 mb-2.5 bg-surface-subtle rounded-lg border border-border-subtle">
+    <nav class="nav-tabs">
       <button class="tab-btn active" data-tab="tab-chat">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>
           <rect x="4" y="8" width="16" height="12" rx="3"/>
           <circle cx="9" cy="13" r="1.5"/>
@@ -61,20 +56,20 @@
         <span>Assistant</span>
       </button>
       <button class="tab-btn" data-tab="tab-workflows">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
         <span>Workflows</span>
       </button>
       <button class="tab-btn" data-tab="tab-vault">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
         </svg>
         <span>Profile Vault</span>
       </button>
       <button class="tab-btn" data-tab="tab-settings">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
@@ -83,12 +78,12 @@
     </nav>
 
     <!-- TAB 1: Chat / Assistant -->
-    <main id="tab-chat" class="tab-content active flex-1 overflow-y-auto">
+    <main id="tab-chat" class="tab-content active">
       <!-- Getting-Started Setup Banner (Shown if API key or Profile is missing) -->
       <section id="onboarding-banner" class="banner-setup" style="display: none;">
         <div class="banner-content">
           <div class="banner-icon">
-            <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -110,7 +105,7 @@
         <button type="button" id="btn-autofill-current-page" class="btn-autofill-hero">
           <div class="hero-btn-content">
             <div class="hero-icon-wrapper">
-              <svg class="w-5 h-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
             </div>
@@ -119,9 +114,11 @@
               <span class="hero-sub">Automatically scans inputs and fills your details</span>
             </div>
           </div>
-          <svg class="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"/>
-          </svg>
+          <div class="hero-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
         </button>
       </section>
 
@@ -136,8 +133,8 @@
 
       <!-- Confirmation Required Card (Safety Gate) -->
       <section id="confirmation-card" class="card card-warning" style="display: none;">
-        <div class="card-header flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #d97706;">
             <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
             <line x1="12" y1="9" x2="12" y2="13"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -154,8 +151,8 @@
 
       <!-- Ask User Question Card -->
       <section id="question-card" class="card card-info" style="display: none;">
-        <div class="card-header flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4f46e5;">
             <circle cx="12" cy="12" r="10"/>
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -173,8 +170,8 @@
       <!-- Action Log Stream -->
       <section class="log-section">
         <div class="section-header">
-          <div class="flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-ink-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
               <line x1="16" y1="13" x2="8" y2="13"/>
@@ -184,7 +181,7 @@
           </div>
           <div class="log-actions">
             <button id="btn-save-as-workflow" class="btn btn-outline btn-xs" style="display: none;">
-              <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
               Save Workflow
             </button>
             <button id="btn-clear-logs" class="btn btn-text btn-xs" title="Clear log">Clear</button>
@@ -197,7 +194,6 @@
 
       <!-- Quick Shortcuts Bar -->
       <section class="templates-bar">
-        <span class="text-[11px] text-ink-muted font-medium mb-1 block">Quick shortcuts:</span>
         <div class="templates-scroll" id="pinned-templates-list"></div>
       </section>
 
@@ -211,7 +207,7 @@
         ></textarea>
         <div class="input-actions">
           <button type="button" id="btn-mic" class="btn-icon" title="Voice Input (Speech Recognition)">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
               <line x1="12" y1="19" x2="12" y2="23"/>
@@ -219,7 +215,7 @@
             </svg>
           </button>
           <button type="submit" id="btn-send" class="btn btn-primary btn-sm">
-            <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m22 2-7 20-4-9-9-4Z"/>
               <path d="M22 2 11 13"/>
             </svg>
@@ -230,10 +226,10 @@
     </main>
 
     <!-- TAB 2: Workflows -->
-    <section id="tab-workflows" class="tab-content flex-1 overflow-y-auto">
+    <section id="tab-workflows" class="tab-content">
       <div class="section-title">
-        <div class="flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4f46e5;">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
           <h2>Saved Workflows</h2>
@@ -244,9 +240,9 @@
         <div class="empty-state">No saved workflows yet. Complete a form run and click "Save Workflow".</div>
       </div>
 
-      <div class="section-title mt-4">
-        <div class="flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div class="section-title mt-2">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4f46e5;">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
             <line x1="8" y1="21" x2="16" y2="21"/>
             <line x1="12" y1="17" x2="12" y2="21"/>
@@ -259,11 +255,11 @@
     </section>
 
     <!-- TAB 3: Profile Vault -->
-    <section id="tab-vault" class="tab-content flex-1 overflow-y-auto">
-      <div class="section-title flex items-center justify-between">
+    <section id="tab-vault" class="tab-content">
+      <div class="section-title" style="display: flex; align-items: center; justify-content: space-between;">
         <div>
-          <div class="flex items-center gap-1.5">
-            <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4f46e5;">
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
@@ -280,7 +276,7 @@
         <!-- Section 1: Personal Info -->
         <div class="vault-group-card">
           <div class="group-card-header">
-            <svg class="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
@@ -294,7 +290,64 @@
             </div>
             <div class="form-group col">
               <label for="v-dob">Date of Birth</label>
-              <input type="date" id="v-dob" />
+              <input type="date" id="v-dob" style="display: none;" />
+              <div class="custom-datepicker-container" id="custom-dp-dob">
+                <button type="button" class="custom-dp-trigger" id="custom-dp-dob-trigger">
+                  <div class="dp-trigger-left">
+                    <svg class="dp-calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span class="dp-value-text" id="custom-dp-dob-label">Select Date</span>
+                  </div>
+                  <svg class="dp-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                <div class="custom-dp-popover" id="custom-dp-dob-popover">
+                  <div class="dp-header">
+                    <button type="button" class="dp-month-nav" id="dp-prev-month" title="Previous Month">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <div class="dp-month-year-group">
+                      <select id="dp-month-select" class="dp-header-select">
+                        <option value="0">Jan</option>
+                        <option value="1">Feb</option>
+                        <option value="2">Mar</option>
+                        <option value="3">Apr</option>
+                        <option value="4">May</option>
+                        <option value="5">Jun</option>
+                        <option value="6">Jul</option>
+                        <option value="7">Aug</option>
+                        <option value="8">Sep</option>
+                        <option value="9">Oct</option>
+                        <option value="10">Nov</option>
+                        <option value="11">Dec</option>
+                      </select>
+                      <select id="dp-year-select" class="dp-header-select"></select>
+                    </div>
+                    <button type="button" class="dp-month-nav" id="dp-next-month" title="Next Month">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                  <div class="dp-weekdays">
+                    <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                  </div>
+                  <div class="dp-days-grid" id="dp-days-grid"></div>
+                  <div class="dp-presets">
+                    <span class="dp-presets-title">Student birth years:</span>
+                    <div class="dp-presets-chips" id="dp-presets-chips">
+                      <button type="button" class="dp-year-chip" data-year="2002">2002</button>
+                      <button type="button" class="dp-year-chip" data-year="2003">2003</button>
+                      <button type="button" class="dp-year-chip" data-year="2004">2004</button>
+                      <button type="button" class="dp-year-chip" data-year="2005">2005</button>
+                      <button type="button" class="dp-year-chip" data-year="2006">2006</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -336,7 +389,7 @@
         <!-- Section 2: Contact & Address -->
         <div class="vault-group-card">
           <div class="group-card-header">
-            <svg class="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
             <span>Contact & Address</span>
@@ -367,39 +420,40 @@
               <label for="v-state">State</label>
               <input type="text" id="v-state" placeholder="Madhya Pradesh" />
             </div>
-            <div class="form-group col">
-              <label for="v-pincode">Pincode</label>
-              <input type="text" id="v-pincode" placeholder="462003" />
-            </div>
+          </div>
+          <div class="form-group">
+            <label for="v-pincode">Pincode</label>
+            <input type="text" id="v-pincode" placeholder="462003" />
           </div>
         </div>
 
         <!-- Section 3: Academic Details -->
         <div class="vault-group-card">
           <div class="group-card-header">
-            <svg class="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
               <path d="M6 12v5c3 3 9 3 12 0v-5"/>
             </svg>
             <span>Academic Details</span>
           </div>
 
-          <div class="form-row">
-            <div class="form-group col-2">
-              <label for="v-college">College / Institute</label>
-              <input type="text" id="v-college" placeholder="MANIT Bhopal" />
-            </div>
-            <div class="form-group col">
-              <label for="v-rollno">Roll / Scholar No.</label>
-              <input type="text" id="v-rollno" placeholder="24112011148" />
-            </div>
+          <div class="form-group">
+            <label for="v-college">College / Institute</label>
+            <input type="text" id="v-college" placeholder="MANIT Bhopal" />
           </div>
 
           <div class="form-row">
             <div class="form-group col">
+              <label for="v-rollno">Roll / Scholar No.</label>
+              <input type="text" id="v-rollno" placeholder="24112011148" />
+            </div>
+            <div class="form-group col">
               <label for="v-degree">Degree / Course</label>
               <input type="text" id="v-degree" placeholder="B.Tech" />
             </div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group col">
               <label for="v-branch">Branch / Major</label>
               <input type="text" id="v-branch" placeholder="CSE" />
@@ -412,13 +466,13 @@
         </div>
 
         <!-- Section 4: Sensitive Identifiers -->
-        <div class="vault-group-card border-emerald-200 bg-emerald-50/30">
-          <div class="group-card-header text-emerald-800">
-            <svg class="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="vault-group-card" style="border-color: #a7f3d0; background-color: #f0fdf4;">
+          <div class="group-card-header" style="color: #047857; border-color: #dcfce7;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #059669;">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
-            <span>Protected Identifiers (Stored locally, never sent to AI)</span>
+            <span>Protected Identifiers (Zero Egress)</span>
           </div>
 
           <div class="form-row">
@@ -433,9 +487,28 @@
           </div>
         </div>
 
+
+        <!-- Section 5: Portal Logins -->
+        <div class="vault-group-card" style="border-color: #cbd5e1; background-color: #f8fafc;">
+          <div class="group-card-header" style="color: #334155; border-color: #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #64748b;">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+              <span>Saved Portal Logins (College ERPs & Portals)</span>
+            </div>
+            <span class="sub-text" style="font-size: 11px;">Local & Zero Egress</span>
+          </div>
+          <div id="portal-credentials-list" class="portal-creds-list" style="padding: 8px 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div class="text-xs text-muted" style="color: #64748b; font-size: 11px;">No portal logins saved yet. Use chat (e.g. "my id is ... and pass is ...") to save automatically.</div>
+          </div>
+        </div>
+
         <div class="vault-actions">
           <button type="submit" class="btn btn-primary btn-sm">
-            <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
@@ -443,7 +516,7 @@
             Save Profile
           </button>
           <button type="button" id="btn-export-data" class="btn btn-secondary btn-sm">
-            <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
@@ -451,7 +524,7 @@
             Export JSON
           </button>
           <button type="button" id="btn-wipe-data" class="btn btn-danger-outline btn-sm">
-            <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
             </svg>
@@ -462,12 +535,12 @@
     </section>
 
     <!-- TAB 4: Settings -->
-    <section id="tab-settings" class="tab-content flex-1 overflow-y-auto">
+    <section id="tab-settings" class="tab-content">
       <div class="section-title">
-        <div class="flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4f46e5;">
             <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
           <h2>Extension Settings</h2>
         </div>
@@ -476,33 +549,33 @@
 
       <form id="settings-form" class="settings-form">
         <div class="form-group">
-          <div class="flex items-center justify-between">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
             <label for="s-apikey">Google Gemini API Key (BYOK)</label>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" class="text-[11px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style="font-size: 11px; color: #4f46e5; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
               <span>Get Free Key</span>
-              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 11px; height: 11px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>
           </div>
           <div class="input-password-wrapper">
             <input type="password" id="s-apikey" placeholder="Paste your API key (starts with AIzaSy...)" />
             <button type="button" id="btn-toggle-apikey" class="btn-text btn-xs">Show</button>
           </div>
-          <small class="text-ink-muted text-[11px] mt-1 block">Your key is stored strictly on your device in extension storage.</small>
+          <small style="color: var(--text-muted); font-size: 10.5px; margin-top: 2px; display: block;">Your key is stored strictly on your device in extension storage.</small>
         </div>
 
         <div class="form-group">
           <label for="s-model">Gemini Model</label>
           <select id="s-model">
-            <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended & Free)</option>
-            <option value="gemini-2.0-flash">gemini-2.0-flash (Fastest)</option>
-            <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Experimental)</option>
-            <option value="gemini-1.5-pro">gemini-1.5-pro (Complex Reasoning)</option>
+            <option value="gemini-3.5-flash">gemini-3.5-flash (Recommended & Verified)</option>
+            <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (Fastest)</option>
+            <option value="gemini-3.8-flash">gemini-3.8-flash (Latest)</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash (Legacy)</option>
           </select>
         </div>
 
         <div class="form-group">
           <label class="checkbox-label">
-            <input type="checkbox" id="s-dryrun" class="rounded border-border-soft text-indigo-600 focus:ring-indigo-500/20" />
+            <input type="checkbox" id="s-dryrun" />
             <span>Dry Run Mode (Preview actions without altering webpage)</span>
           </label>
         </div>
@@ -526,9 +599,9 @@
           </select>
         </div>
 
-        <div class="flex gap-2">
-          <button type="submit" class="btn btn-primary btn-sm flex-1">
-            <svg class="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary btn-sm" style="flex: 1;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
@@ -536,7 +609,7 @@
             Save Settings
           </button>
           <button type="button" id="btn-test-apikey" class="btn btn-secondary btn-sm">
-            <svg class="w-3.5 h-3.5 mr-1 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #059669;">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             Test Key
@@ -544,9 +617,9 @@
         </div>
       </form>
 
-      <div class="section-title mt-4">
-        <div class="flex items-center gap-1.5">
-          <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div class="section-title mt-2">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #059669;">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
           <h3>Privacy Audit Log</h3>
@@ -554,7 +627,7 @@
         <span class="sub-text">Zero-knowledge proof: counts of masked PII fields</span>
       </div>
       <div id="audit-log-view" class="audit-log-view">
-        <div class="text-ink-muted text-xs text-center py-4">No PII was sent to the model yet.</div>
+        <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 16px 0;">No PII was sent to the model yet.</div>
       </div>
     </section>
   </div>
