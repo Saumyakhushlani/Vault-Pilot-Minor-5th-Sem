@@ -279,7 +279,7 @@ export class AgentLoop {
       const saved = res[SETTINGS_STORAGE_KEY] || {};
       return {
         geminiApiKey: saved.geminiApiKey || '',
-        modelName: saved.modelName || 'gemini-2.0-flash',
+        modelName: saved.modelName || 'gemini-1.5-flash',
         executionMode: saved.executionMode || 'autopilot',
         dryRun: Boolean(saved.dryRun),
         maxSteps: saved.maxSteps || 15,
@@ -289,7 +289,7 @@ export class AgentLoop {
     }
     return {
       geminiApiKey: '',
-      modelName: 'gemini-2.0-flash',
+      modelName: 'gemini-1.5-flash',
       executionMode: 'autopilot',
       dryRun: false,
       maxSteps: 15,

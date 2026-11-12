@@ -77,7 +77,7 @@ export async function sendToModel(
 
   for await (const chunk of streamGemini({
     apiKey: config.apiKey,
-    model: config.modelName || 'gemini-2.0-flash',
+    model: config.modelName || 'gemini-1.5-flash',
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: sanitizedUserPrompt,
     signal: config.signal,

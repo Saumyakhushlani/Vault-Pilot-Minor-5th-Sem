@@ -580,7 +580,7 @@ async function loadSettingsFromStorage(): Promise<ExtensionSettings> {
   const res = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
   return res[SETTINGS_STORAGE_KEY] || {
     geminiApiKey: '',
-    modelName: 'gemini-2.0-flash',
+    modelName: 'gemini-1.5-flash',
     executionMode: 'autopilot',
     dryRun: false,
     maxSteps: 15,
@@ -592,7 +592,7 @@ async function loadSettingsFromStorage(): Promise<ExtensionSettings> {
 async function loadSettingsIntoForm(): Promise<void> {
   const s = await loadSettingsFromStorage();
   sApiKey.value = s.geminiApiKey || '';
-  sModel.value = s.modelName || 'gemini-2.0-flash';
+  sModel.value = s.modelName || 'gemini-1.5-flash';
   sDryRun.checked = Boolean(s.dryRun);
   sMaxSteps.value = String(s.maxSteps || 15);
   sAllowList.value = (s.domainAllowList || []).join('\n');
