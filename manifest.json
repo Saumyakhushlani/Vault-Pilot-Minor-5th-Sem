@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "VaultPilot",
+  "version": "0.1.0",
+  "description": "Privacy-First AI Browser Automation Agent with Local Data Protection. BYOK, no backend.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content-main.ts"],
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_title": "Open VaultPilot"
+  }
+}
