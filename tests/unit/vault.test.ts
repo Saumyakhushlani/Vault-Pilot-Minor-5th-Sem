@@ -6,6 +6,7 @@ import {
   wipeAllData,
   saveProfile,
   getProfile,
+  normalizeUserProfile,
   SETTINGS_STORAGE_KEY,
   findUnresolvedTokens,
   savePortalCredential,
@@ -62,7 +63,76 @@ describe('Profile Vault - Token Substitution Engine', () => {
     expect(result).toBe('Name: Alex, Phone: {profile.phone}, Unknown: {profile.nonexistent}');
   });
 
-  it('returns available profile tokens without leaking real values', () => {
+  it('resolves diverse token aliases (scholar_no, roll_number, mobile_number, etc.)', () => {
+    const template = 'Scholar: {profile.scholar_no}, Roll: {profile.roll_number}, Mobile: {profile.mobile_number}, UID: {profile.aadhaar_number}, PAN: {profile.pan_card}';
+    const result = substituteProfileValues(template, mockProfile);
+
+    expect(result).toBe('Scholar: 24112011148, Roll: 24112011148, Mobile: 9876543210, UID: 234567890128, PAN: ABCDE1234F');
+  });
+
+  it('guarantees zero unresolved tokens when profile has all details present', () => {
+    const actionValue = '{profile.scholar_number}';
+    const resolved = substituteProfileValues(actionValue, mockProfile);
+    const unresolved = findUnresolvedTokens(resolved);
+
+    // Because profile.rollNo is populated, substitution resolves it immediately
+    expect(resolved).toBe('24112011148');
+    expect(unresolved.length).toBe(0);
+  });
+
+  it('falls back portal.username to profile.rollNo on university/college portals if credential username is empty', () => {
+    const template = 'Login ID: {portal.username}';
+    const result = substituteProfileValues(template, mockProfile);
+
+    expect(result).toBe('Login ID: 24112011148');
+  });
+
+  it('auto-derives first_name and last_name when only full_name is provided in profile', () => {
+    const profileOnlyFullName: UserProfile = {
+      fullName: 'Saumya Khushlani',
+    };
+    const template = 'First: {profile.first_name}, Last: {profile.last_name}, Full: {profile.full_name}';
+    const result = substituteProfileValues(template, profileOnlyFullName);
+
+    expect(result).toBe('First: Saumya, Last: Khushlani, Full: Saumya Khushlani');
+    expect(findUnresolvedTokens(result)).toHaveLength(0);
+  });
+
+  it('correctly handles multi-word names when deriving first and last name', () => {
+    const profileMultiWord: UserProfile = {
+      fullName: 'Mary Jane Watson',
+    };
+    const template = '{profile.first_name} | {profile.last_name}';
+    const result = substituteProfileValues(template, profileMultiWord);
+
+    expect(result).toBe('Mary | Jane Watson');
+  });
+
+  it('prioritizes explicitly set firstName and lastName over fullName splitting', () => {
+    const explicitProfile: UserProfile = {
+      fullName: 'Dr. John Watson MD',
+      firstName: 'John',
+      lastName: 'Watson',
+    };
+    const template = '{profile.first_name} {profile.last_name}';
+    const result = substituteProfileValues(template, explicitProfile);
+
+    expect(result).toBe('John Watson');
+  });
+
+  it('auto-derives full_name when only firstName and lastName are provided in profile', () => {
+    const profileParts: UserProfile = {
+      firstName: 'Saumya',
+      lastName: 'Khushlani',
+    };
+    const template = 'Full: {profile.full_name}';
+    const result = substituteProfileValues(template, profileParts);
+
+    expect(result).toBe('Full: Saumya Khushlani');
+    expect(findUnresolvedTokens(result)).toHaveLength(0);
+  });
+
+    it('returns available profile tokens without leaking real values', () => {
     const tokens = getAvailableProfileTokens(mockProfile);
 
     expect(tokens).toContain('{profile.full_name}');
@@ -111,12 +181,21 @@ describe('Profile Vault - Storage, Export & Sanitization', () => {
     };
   });
 
-  it('persists and retrieves profile in local storage', async () => {
+  it('normalizes user profile directly via normalizeUserProfile helper', () => {
+    const raw: UserProfile = { fullName: 'Saumya Khushlani' };
+    const normalized = normalizeUserProfile(raw);
+    expect(normalized.firstName).toBe('Saumya');
+    expect(normalized.lastName).toBe('Khushlani');
+  });
+
+  it('persists and retrieves profile in local storage with automatic name normalization', async () => {
     const profile: UserProfile = { fullName: 'Test User', email: 'test@example.com' };
     await saveProfile(profile);
     const loaded = await getProfile();
 
     expect(loaded.fullName).toBe('Test User');
+    expect(loaded.firstName).toBe('Test');
+    expect(loaded.lastName).toBe('User');
     expect(loaded.email).toBe('test@example.com');
   });
 

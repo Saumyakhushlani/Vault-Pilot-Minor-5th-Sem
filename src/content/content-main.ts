@@ -98,7 +98,7 @@ if (typeof window !== 'undefined' && window !== window.top) {
             }
           }
 
-          if (!targetEl && 'id' in step.action) {
+          if (!targetEl && 'id' in step.action && typeof step.action.id === 'number') {
             targetEl = findElementByVpId(step.action.id);
           }
 

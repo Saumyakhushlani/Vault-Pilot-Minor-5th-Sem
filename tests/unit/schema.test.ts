@@ -81,6 +81,29 @@ describe('Schema Validator', () => {
     expect(validateAgentResponse(invalidValue).success).toBe(false);
   });
 
+  it('validates and normalizes scroll actions with top, bottom, and id', () => {
+    const raw = {
+      thought: 'Scrolling page',
+      actions: [
+        { type: 'scroll', direction: 'bottom' },
+        { type: 'scroll', direction: 'top' },
+        { type: 'scroll', direction: 'down', amount: '600' },
+        { type: 'scroll', id: 12 },
+      ],
+      status: 'continue',
+    };
+
+    const res = validateAgentResponse(raw);
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.actions).toHaveLength(4);
+      expect(res.data.actions[0]).toEqual({ type: 'scroll', direction: 'bottom', amount: 450 });
+      expect(res.data.actions[1]).toEqual({ type: 'scroll', direction: 'top', amount: 450 });
+      expect(res.data.actions[2]).toEqual({ type: 'scroll', direction: 'down', amount: 600 });
+      expect(res.data.actions[3]).toEqual({ type: 'scroll', direction: 'down', amount: 450, id: 12 });
+    }
+  });
+
   it('rejects invalid status', () => {
     const invalidStatus = {
       thought: 'Done here',

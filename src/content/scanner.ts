@@ -22,14 +22,18 @@ export function isElementVisible(el: Element): boolean {
     return false;
   }
 
-  const style = window.getComputedStyle(el);
-  if (
-    style.display === 'none' ||
-    style.visibility === 'hidden' ||
-    style.opacity === '0' ||
-    style.pointerEvents === 'none'
-  ) {
-    return false;
+  let current: Element | null = el;
+  while (current && current instanceof HTMLElement) {
+    const style = window.getComputedStyle(current);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      style.opacity === '0' ||
+      (current === el && style.pointerEvents === 'none')
+    ) {
+      return false;
+    }
+    current = current.parentElement;
   }
 
   return true;
@@ -128,6 +132,14 @@ export function generateResilientSelector(el: Element): string {
   return `${tag}:nth-of-type(${index})`;
 }
 
+export function clearAllVpIds(root: ParentNode = document): void {
+  for (const el of walkDom(root)) {
+    if (el.hasAttribute('data-vp-id')) {
+      el.removeAttribute('data-vp-id');
+    }
+  }
+}
+
 export function scanInteractiveElements(
   root: ParentNode = document,
   options: {
@@ -136,6 +148,10 @@ export function scanInteractiveElements(
     inIframe?: boolean;
   } = {}
 ): { elements: ScannedElement[]; nextId: number } {
+  if (!options.inShadow && !options.inIframe) {
+    clearAllVpIds(root);
+  }
+
   const elements: ScannedElement[] = [];
   let currentId = options.startId || 1;
 
@@ -160,6 +176,17 @@ export function scanInteractiveElements(
     const type = (el.getAttribute('type') || (tag === 'select' ? 'select' : tag === 'textarea' ? 'textarea' : null))?.toLowerCase() || null;
 
     if (tag === 'input' && type === 'hidden') {
+      continue;
+    }
+
+    // Filter out CAPTCHA badges and bot-challenge widgets so the agent focuses on actual form inputs
+    const isCaptchaElement =
+      (el.closest && el.closest('.grecaptcha-badge, .h-captcha, .cf-turnstile, [data-sitekey]') !== null) ||
+      (el.getAttribute('title') || '').toLowerCase().includes('recaptcha') ||
+      (el.getAttribute('aria-label') || '').toLowerCase().includes('recaptcha') ||
+      (el.tagName.toLowerCase() === 'a' && ((el as HTMLAnchorElement).href || '').toLowerCase().includes('recaptcha'));
+
+    if (isCaptchaElement) {
       continue;
     }
 
@@ -223,6 +250,20 @@ export function scanPage(): ScanResult {
   const iframes = document.querySelectorAll('iframe');
   for (let i = 0; i < iframes.length; i++) {
     const iframe = iframes[i];
+    const iframeSrc = (iframe.getAttribute('src') || '').toLowerCase();
+    const iframeTitle = (iframe.getAttribute('title') || '').toLowerCase();
+
+    if (
+      iframeSrc.includes('recaptcha') ||
+      iframeSrc.includes('hcaptcha') ||
+      iframeSrc.includes('turnstile') ||
+      iframeSrc.includes('challenges.cloudflare') ||
+      iframeTitle.includes('recaptcha')
+    ) {
+      inaccessibleFrames++;
+      continue;
+    }
+
     try {
       const iframeDoc = iframe.contentDocument;
       if (iframeDoc) {

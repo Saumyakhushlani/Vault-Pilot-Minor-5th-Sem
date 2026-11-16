@@ -79,6 +79,24 @@ describe('Content Scanner - DOM Traversal & Label Resolution', () => {
     expect(el1).not.toBeNull();
     expect(el1.id).toBe('input-name');
   });
+
+  it('filters out CAPTCHA badges and bot-check elements to avoid agent distraction', () => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <input type="text" id="real-input" />
+      <div class="grecaptcha-badge">
+        <a href="https://www.google.com/recaptcha">reCAPTCHA</a>
+      </div>
+      <button class="h-captcha">Verify</button>
+      <a href="https://www.google.com/policies/privacy/" title="reCAPTCHA privacy">Privacy</a>
+    `;
+    document.body.appendChild(container);
+
+    const { elements } = scanInteractiveElements(container);
+
+    expect(elements.length).toBe(1);
+    expect(elements[0].selector).toBe('#real-input');
+  });
 });
 
 describe('Content Executor - DOM Mutation & Action Dispatch', () => {
@@ -149,6 +167,26 @@ describe('Content Executor - DOM Mutation & Action Dispatch', () => {
     expect(clicked).toBe(true);
   });
 
+  it('executes scroll action down, up, and to specific element', async () => {
+    let windowScrolled = false;
+    window.scrollBy = () => { windowScrolled = true; };
+    window.scrollTo = () => { windowScrolled = true; };
+
+    const scrollDown: AgentAction = { type: 'scroll', direction: 'down', amount: 500 };
+    const res1 = await executeSingleAction(scrollDown, profile);
+    expect(res1.success).toBe(true);
+    expect(windowScrolled).toBe(true);
+
+    let elementScrolledIntoView = false;
+    const target = document.getElementById('target-button')!;
+    target.scrollIntoView = () => { elementScrolledIntoView = true; };
+
+    const scrollElement: AgentAction = { type: 'scroll', id: 4 };
+    const res2 = await executeSingleAction(scrollElement, profile);
+    expect(res2.success).toBe(true);
+    expect(elementScrolledIntoView).toBe(true);
+  });
+
   it('executes action batch sequentially and stops on element missing error', async () => {
     const actions: AgentAction[] = [
       { type: 'type', id: 1, value: 'Hello' },
@@ -162,5 +200,111 @@ describe('Content Executor - DOM Mutation & Action Dispatch', () => {
     expect(results[1].success).toBe(true);
     expect(results[2].success).toBe(false);
     expect(results[2].error).toContain('Element with id 999 not found');
+  });
+
+  it('executes click action on a checkbox toggling it to checked true without double-toggling', async () => {
+    const checkbox = document.getElementById('target-check') as HTMLInputElement;
+    checkbox.checked = false;
+
+    const action: AgentAction = { type: 'click', id: 3 };
+    const res = await executeSingleAction(action, profile);
+
+    expect(res.success).toBe(true);
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it('handles multi-step form transitions without stale data-vp-id collisions', () => {
+    document.body.innerHTML = `
+      <div id="step-1" style="display: block;">
+        <input type="text" id="s1-name" />
+        <button id="s1-next">Next</button>
+      </div>
+      <div id="step-2" style="display: none;">
+        <input type="email" id="s2-email" />
+        <button id="s2-submit">Submit</button>
+      </div>
+    `;
+
+    // Scan Step 1
+    const scan1 = scanInteractiveElements(document);
+    expect(scan1.elements).toHaveLength(2);
+    expect(document.getElementById('s1-name')?.getAttribute('data-vp-id')).toBe('1');
+    expect(document.getElementById('s1-next')?.getAttribute('data-vp-id')).toBe('2');
+
+    // Simulate clicking Next: hide step 1, show step 2
+    document.getElementById('step-1')!.style.display = 'none';
+    document.getElementById('step-2')!.style.display = 'block';
+
+    // Scan Step 2
+    const scan2 = scanInteractiveElements(document);
+    expect(scan2.elements).toHaveLength(2);
+
+    // Verify Step 1 no longer has stale data-vp-id
+    expect(document.getElementById('s1-name')?.hasAttribute('data-vp-id')).toBe(false);
+    // Verify Step 2 received fresh data-vp-id
+    expect(document.getElementById('s2-email')?.getAttribute('data-vp-id')).toBe('1');
+
+    // findElementByVpId(1) must resolve to Step 2 element, NOT Step 1
+    const found = findElementByVpId(1);
+    expect(found?.id).toBe('s2-email');
+  });
+
+  it('normalizes various non-ISO date formats into YYYY-MM-DD for date inputs', async () => {
+    document.body.innerHTML = `
+      <input type="date" id="dob-input" data-vp-id="1" />
+    `;
+
+    const dobInput = document.getElementById('dob-input') as HTMLInputElement;
+
+    // Test DD/MM/YYYY
+    await executeSingleAction({ type: 'type', id: 1, value: '15/05/2004' }, profile);
+    expect(dobInput.value).toBe('2004-05-15');
+
+    // Test DD-MM-YYYY
+    await executeSingleAction({ type: 'type', id: 1, value: '25-12-2003' }, profile);
+    expect(dobInput.value).toBe('2003-12-25');
+
+    // Test verbal date
+    await executeSingleAction({ type: 'type', id: 1, value: 'May 15, 2004' }, profile);
+    expect(dobInput.value).toBe('2004-05-15');
+
+    // Test profile token replacement with non-ISO profile dob
+    const customProfile: UserProfile = { ...profile, dob: '15/05/2004' };
+    await executeSingleAction({ type: 'type', id: 1, value: '{profile.dob}' }, customProfile);
+    expect(dobInput.value).toBe('2004-05-15');
+  });
+
+  it('fuzzy matches and selects degree dropdown options via type and select actions', async () => {
+    document.body.innerHTML = `
+      <select id="degree-select" data-vp-id="2">
+        <option value="">-- Select Degree --</option>
+        <option value="B.Tech">B.Tech</option>
+        <option value="M.Tech">M.Tech</option>
+        <option value="MCA">MCA</option>
+        <option value="Ph.D">Ph.D</option>
+      </select>
+    `;
+
+    const degreeSelect = document.getElementById('degree-select') as HTMLSelectElement;
+
+    // 1. Model emits action 'type' on a select with 'btech' (lowercase, no dots)
+    await executeSingleAction({ type: 'type', id: 2, value: 'btech' }, profile);
+    expect(degreeSelect.value).toBe('B.Tech');
+    expect(degreeSelect.selectedIndex).toBe(1);
+
+    // 2. Model emits action 'select' with full degree name 'Bachelor of Technology'
+    await executeSingleAction({ type: 'select', id: 2, value: 'Bachelor of Technology' }, profile);
+    expect(degreeSelect.value).toBe('B.Tech');
+    expect(degreeSelect.selectedIndex).toBe(1);
+
+    // 3. Model emits action 'type' with 'MCA'
+    await executeSingleAction({ type: 'type', id: 2, value: 'MCA' }, profile);
+    expect(degreeSelect.value).toBe('MCA');
+    expect(degreeSelect.selectedIndex).toBe(3);
+
+    // 4. Model emits action 'select' with 'phd' (no dots)
+    await executeSingleAction({ type: 'select', id: 2, value: 'phd' }, profile);
+    expect(degreeSelect.value).toBe('Ph.D');
+    expect(degreeSelect.selectedIndex).toBe(4);
   });
 });

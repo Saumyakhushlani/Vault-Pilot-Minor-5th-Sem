@@ -70,8 +70,9 @@ export interface CheckAction extends BaseAction {
 
 export interface ScrollAction extends BaseAction {
   type: 'scroll';
-  direction?: 'up' | 'down';
+  direction?: 'up' | 'down' | 'top' | 'bottom';
   amount?: number;
+  id?: number;
 }
 
 export interface WaitAction extends BaseAction {

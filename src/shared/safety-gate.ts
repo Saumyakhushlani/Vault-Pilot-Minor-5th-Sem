@@ -41,7 +41,7 @@ export function evaluateActionSafety(
   if (settings.executionMode === 'step-by-step') {
     let targetLabel: string | undefined;
     let targetTag: string | undefined;
-    if ('id' in action && elementsMap.has(action.id)) {
+    if ('id' in action && typeof action.id === 'number' && elementsMap.has(action.id)) {
       const el = elementsMap.get(action.id);
       targetLabel = el?.label;
       targetTag = el?.tag;
@@ -57,7 +57,7 @@ export function evaluateActionSafety(
     };
   }
 
-  if ('id' in action) {
+  if ('id' in action && typeof action.id === 'number') {
     const element = elementsMap.get(action.id);
     const level = classifyElementSafety(element);
 

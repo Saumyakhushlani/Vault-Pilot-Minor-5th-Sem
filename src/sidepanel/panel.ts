@@ -637,6 +637,10 @@ async function renderPortalCredentials(): Promise<void> {
 async function loadProfileIntoForm(): Promise<void> {
   const p = await getProfile();
   (document.getElementById('v-fullname') as HTMLInputElement).value = p.fullName || '';
+  const firstNameEl = document.getElementById('v-firstname') as HTMLInputElement | null;
+  const lastNameEl = document.getElementById('v-lastname') as HTMLInputElement | null;
+  if (firstNameEl) firstNameEl.value = p.firstName || '';
+  if (lastNameEl) lastNameEl.value = p.lastName || '';
   (document.getElementById('v-dob') as HTMLInputElement).value = p.dob || '';
   (document.getElementById('v-gender') as HTMLSelectElement).value = p.gender || '';
   (document.getElementById('v-category') as HTMLSelectElement).value = p.category || '';
@@ -653,6 +657,8 @@ async function loadProfileIntoForm(): Promise<void> {
   (document.getElementById('v-degree') as HTMLInputElement).value = p.degree || '';
   (document.getElementById('v-branch') as HTMLInputElement).value = p.branch || '';
   (document.getElementById('v-cgpa') as HTMLInputElement).value = p.cgpa || '';
+  const gradYearEl = document.getElementById('v-gradyear') as HTMLInputElement | null;
+  if (gradYearEl) gradYearEl.value = p.graduationYear || '';
   (document.getElementById('v-aadhaar') as HTMLInputElement).value = p.aadhaar || '';
   (document.getElementById('v-pan') as HTMLInputElement).value = p.pan || '';
   customControls?.syncAll();
@@ -660,8 +666,12 @@ async function loadProfileIntoForm(): Promise<void> {
 
 // 1-Click Fill Demo Profile
 if (btnFillDemoVault) {
-  btnFillDemoVault.addEventListener('click', () => {
+  btnFillDemoVault.addEventListener('click', async () => {
     (document.getElementById('v-fullname') as HTMLInputElement).value = 'Saumya Khushlani';
+    const firstNameEl = document.getElementById('v-firstname') as HTMLInputElement | null;
+    const lastNameEl = document.getElementById('v-lastname') as HTMLInputElement | null;
+    if (firstNameEl) firstNameEl.value = 'Saumya';
+    if (lastNameEl) lastNameEl.value = 'Khushlani';
     (document.getElementById('v-dob') as HTMLInputElement).value = '2004-05-15';
     (document.getElementById('v-gender') as HTMLSelectElement).value = 'Male';
     (document.getElementById('v-category') as HTMLSelectElement).value = 'General';
@@ -678,18 +688,103 @@ if (btnFillDemoVault) {
     (document.getElementById('v-degree') as HTMLInputElement).value = 'B.Tech';
     (document.getElementById('v-branch') as HTMLInputElement).value = 'Computer Science & Engineering';
     (document.getElementById('v-cgpa') as HTMLInputElement).value = '8.75';
+    const gradYearDemoEl = document.getElementById('v-gradyear') as HTMLInputElement | null;
+    if (gradYearDemoEl) gradYearDemoEl.value = '2026';
     (document.getElementById('v-aadhaar') as HTMLInputElement).value = '234567890128';
     (document.getElementById('v-pan') as HTMLInputElement).value = 'ABCDE1234F';
     customControls?.syncAll();
 
-    alert('Demo student profile loaded into form! Click "Save Profile" below to persist.');
+    const demoProfile: UserProfile = {
+      fullName: 'Saumya Khushlani',
+      firstName: 'Saumya',
+      lastName: 'Khushlani',
+      dob: '2004-05-15',
+      gender: 'Male',
+      category: 'General',
+      fatherName: 'Ramesh Khushlani',
+      motherName: 'Anita Khushlani',
+      email: 'saumya@example.com',
+      phone: '9876543210',
+      address: 'MANIT Campus, Link Road No. 3',
+      city: 'Bhopal',
+      state: 'Madhya Pradesh',
+      pincode: '462003',
+      collegeName: 'Maulana Azad National Institute of Technology Bhopal',
+      rollNo: '24112011148',
+      degree: 'B.Tech',
+      branch: 'Computer Science & Engineering',
+      graduationYear: '2026',
+      cgpa: '8.75',
+      aadhaar: '234567890128',
+      pan: 'ABCDE1234F',
+    };
+    await saveProfile(demoProfile);
+    alert('Demo student profile loaded and automatically saved to Vault!');
+  });
+}
+
+// Two-way interactive sync between Full Name and First/Last Name inputs
+const vFullNameInput = document.getElementById('v-fullname') as HTMLInputElement | null;
+const vFirstNameInput = document.getElementById('v-firstname') as HTMLInputElement | null;
+const vLastNameInput = document.getElementById('v-lastname') as HTMLInputElement | null;
+
+if (vFullNameInput && vFirstNameInput && vLastNameInput) {
+  vFullNameInput.addEventListener('input', () => {
+    const val = vFullNameInput.value.trim();
+    if (val) {
+      const parts = val.split(/\s+/);
+      if (!vFirstNameInput.value || vFirstNameInput.dataset.autoSynced === 'true') {
+        vFirstNameInput.value = parts[0] || '';
+        vFirstNameInput.dataset.autoSynced = 'true';
+      }
+      if (!vLastNameInput.value || vLastNameInput.dataset.autoSynced === 'true') {
+        vLastNameInput.value = parts.length > 1 ? parts.slice(1).join(' ') : '';
+        vLastNameInput.dataset.autoSynced = 'true';
+      }
+    }
+  });
+
+  vFirstNameInput.addEventListener('input', () => {
+    vFirstNameInput.dataset.autoSynced = 'false';
+    const first = vFirstNameInput.value.trim();
+    const last = vLastNameInput.value.trim();
+    if (!vFullNameInput.value || vFullNameInput.dataset.autoSynced === 'true') {
+      vFullNameInput.value = [first, last].filter(Boolean).join(' ');
+      vFullNameInput.dataset.autoSynced = 'true';
+    }
+  });
+
+  vLastNameInput.addEventListener('input', () => {
+    vLastNameInput.dataset.autoSynced = 'false';
+    const first = vFirstNameInput.value.trim();
+    const last = vLastNameInput.value.trim();
+    if (!vFullNameInput.value || vFullNameInput.dataset.autoSynced === 'true') {
+      vFullNameInput.value = [first, last].filter(Boolean).join(' ');
+      vFullNameInput.dataset.autoSynced = 'true';
+    }
   });
 }
 
 vaultForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  const fullName = (document.getElementById('v-fullname') as HTMLInputElement).value.trim();
+  const firstNameInput = document.getElementById('v-firstname') as HTMLInputElement | null;
+  const lastNameInput = document.getElementById('v-lastname') as HTMLInputElement | null;
+  let firstName = firstNameInput ? firstNameInput.value.trim() : '';
+  let lastName = lastNameInput ? lastNameInput.value.trim() : '';
+
+  if (fullName && !firstName) {
+    firstName = fullName.split(/\s+/)[0] || '';
+  }
+  if (fullName && !lastName) {
+    const parts = fullName.split(/\s+/);
+    lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+  }
+
   const profile: UserProfile = {
-    fullName: (document.getElementById('v-fullname') as HTMLInputElement).value.trim(),
+    fullName,
+    firstName,
+    lastName,
     dob: (document.getElementById('v-dob') as HTMLInputElement).value,
     gender: (document.getElementById('v-gender') as HTMLSelectElement).value,
     category: (document.getElementById('v-category') as HTMLSelectElement).value,
@@ -706,6 +801,7 @@ vaultForm.addEventListener('submit', async (e) => {
     degree: (document.getElementById('v-degree') as HTMLInputElement).value.trim(),
     branch: (document.getElementById('v-branch') as HTMLInputElement).value.trim(),
     cgpa: (document.getElementById('v-cgpa') as HTMLInputElement).value.trim(),
+    graduationYear: (document.getElementById('v-gradyear') as HTMLInputElement)?.value.trim() || '2026',
     aadhaar: (document.getElementById('v-aadhaar') as HTMLInputElement).value.trim(),
     pan: (document.getElementById('v-pan') as HTMLInputElement).value.trim(),
   };

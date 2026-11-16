@@ -1,6 +1,6 @@
 import { sendToModel } from '../shared/gateway';
 import { evaluateActionSafety, isDomainAllowed } from '../shared/safety-gate';
-import { getProfile, saveProfile, getPortalCredential, savePortalCredential, findUnresolvedTokens, TOKEN_KEY_MAP, substituteProfileValues, SETTINGS_STORAGE_KEY } from '../shared/vault';
+import { getProfile, saveProfile, getPortalCredential, savePortalCredential, findUnresolvedTokens, TOKEN_KEY_MAP, substituteProfileValues, getAvailableProfileTokens, SETTINGS_STORAGE_KEY } from '../shared/vault';
 import { extractCredentialsFromCommand, humanizeToken } from '../shared/credential-extractor';
 import {
   ActionSafetyEvaluation,
@@ -191,12 +191,14 @@ export class AgentLoop {
 
         let modelResponse: AgentResponse;
         try {
+          const availableTokens = getAvailableProfileTokens(userProfile, this.activePortalCred);
           modelResponse = await sendToModel(
           {
             command: llmCommand,
             pageTitle: scanResult.title,
             pageUrl: scanResult.url,
             elements: scanResult.elements,
+            customTokens: availableTokens,
           },
           { feature: 'agent_loop' },
           {
@@ -240,9 +242,13 @@ export class AgentLoop {
             continue;
           }
 
-          if (action.type === 'type') {
-            const unresolvedTokens = findUnresolvedTokens(action.value);
-            for (const token of unresolvedTokens) {
+          if (action.type === 'type' || action.type === 'select') {
+            // Step 1: Pre-substitute values using current profile vault and portal credentials
+            let resolvedValue = substituteProfileValues(action.value, userProfile, this.activePortalCred);
+
+            // Step 2: ONLY prompt for tokens that genuinely remain unresolved AFTER substitution
+            const missingTokens = findUnresolvedTokens(resolvedValue);
+            for (const token of missingTokens) {
               if (token.startsWith('{profile.')) {
                 const cleanKey = token.replace(/[{}]/g, '').toLowerCase();
                 const prop = TOKEN_KEY_MAP[cleanKey];
@@ -263,10 +269,39 @@ export class AgentLoop {
                   }
                   await saveProfile(userProfile);
                   this.addLog('success', `Saved "${label}" to Profile Vault!`);
+                  resolvedValue = substituteProfileValues(resolvedValue, userProfile, this.activePortalCred);
+                }
+              } else if (token.startsWith('{portal.')) {
+                const isPassword = token.includes('password') || token.includes('pass') || token.includes('pwd');
+                const promptLabel = isPassword ? 'Password' : 'Username / Scholar ID';
+                this.addLog('info', `Login requires portal ${promptLabel}.`);
+                const answer = await this.promptUserQuestion({
+                  type: 'ask_user',
+                  question: `Portal login requires your ${promptLabel}. Please enter it:`,
+                });
+
+                if (answer && answer.trim()) {
+                  if (!this.activePortalCred) {
+                    this.activePortalCred = {
+                      domain: scanResult.domain,
+                      username: isPassword ? (userProfile.rollNo || '') : answer.trim(),
+                      password: isPassword ? answer.trim() : '',
+                      updatedAt: Date.now(),
+                    };
+                  } else {
+                    if (isPassword) {
+                      this.activePortalCred.password = answer.trim();
+                    } else {
+                      this.activePortalCred.username = answer.trim();
+                    }
+                  }
+                  await savePortalCredential(this.activePortalCred);
+                  this.addLog('success', `Saved portal credential for ${scanResult.domain}!`);
+                  resolvedValue = substituteProfileValues(resolvedValue, userProfile, this.activePortalCred);
                 }
               }
             }
-            action.value = substituteProfileValues(action.value, userProfile, this.activePortalCred);
+            action.value = resolvedValue;
           }
 
           const safetyEval: ActionSafetyEvaluation = evaluateActionSafety(
@@ -276,7 +311,7 @@ export class AgentLoop {
           );
 
           if (safetyEval.requiresApproval) {
-            if ('id' in action) {
+            if ('id' in action && typeof action.id === 'number') {
               await this.highlightTabElement(tabId, action.id);
             }
 
@@ -294,7 +329,7 @@ export class AgentLoop {
             continue;
           }
 
-          this.addLog('action', `Executing: ${action.type}${('id' in action) ? ` on element #${action.id}` : ''}`);
+          this.addLog('action', `Executing: ${action.type}${('id' in action && typeof action.id === 'number') ? ` on element #${action.id}` : ''}`);
           const execRes = await this.executeActionOnTab(tabId, action, userProfile, this.activePortalCred);
 
           if (!execRes.success) {
@@ -302,7 +337,7 @@ export class AgentLoop {
             break;
           }
 
-          const targetEl = 'id' in action ? elementsMap.get(action.id) : undefined;
+          const targetEl = ('id' in action && typeof action.id === 'number') ? elementsMap.get(action.id) : undefined;
           this.recordedSteps.push({
             action,
             selector: targetEl?.selector,
@@ -317,6 +352,27 @@ export class AgentLoop {
         }
 
         if (modelResponse.status === 'done') {
+          // If a click action was executed, check if it transitioned to a new step in a wizard
+          const hasClickAction = modelResponse.actions.some((a) => a.type === 'click');
+          if (hasClickAction && this.currentStep < this.maxSteps) {
+            await new Promise((r) => setTimeout(r, 600));
+            const recheckScan = await this.scanTab(tabId);
+            const remainingInputs = recheckScan?.elements.filter(
+              (el) =>
+                (el.tag === 'input' || el.tag === 'select' || el.tag === 'textarea') &&
+                el.type !== 'hidden' &&
+                (!el.value || el.value.trim() === '')
+            );
+
+            if (remainingInputs && remainingInputs.length > 0) {
+              this.addLog(
+                'info',
+                `Multi-step form progression detected (${remainingInputs.length} field(s) on next step). Continuing automation...`
+              );
+              continue;
+            }
+          }
+
           this.addLog('success', 'Automation completed successfully!');
           break;
         }

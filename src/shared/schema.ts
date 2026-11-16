@@ -124,24 +124,43 @@ export function validateAction(action: unknown, index: number): { valid: true; a
     }
 
     case 'scroll': {
-      let direction: 'up' | 'down' | undefined;
-      if (act.direction !== undefined) {
-        if (act.direction !== 'up' && act.direction !== 'down') {
-          return { valid: false, error: `Action[${index}] (scroll) direction must be 'up' or 'down'` };
+      let direction: 'up' | 'down' | 'top' | 'bottom' = 'down';
+      if (act.direction !== undefined && typeof act.direction === 'string') {
+        const rawDir = act.direction.toLowerCase().trim();
+        if (rawDir === 'up' || rawDir === 'down' || rawDir === 'top' || rawDir === 'bottom') {
+          direction = rawDir;
+        } else if (rawDir.includes('bottom')) {
+          direction = 'bottom';
+        } else if (rawDir.includes('top')) {
+          direction = 'top';
+        } else if (rawDir.includes('up')) {
+          direction = 'up';
+        } else {
+          direction = 'down';
         }
-        direction = act.direction;
       }
-      let amount: number | undefined;
+
+      let amount: number = 450;
       if (act.amount !== undefined) {
-        if (typeof act.amount !== 'number' || isNaN(act.amount)) {
-          return { valid: false, error: `Action[${index}] (scroll) amount must be a number` };
+        const parsed = Number(act.amount);
+        if (!isNaN(parsed) && parsed > 0) {
+          amount = Math.min(parsed, 20000);
         }
-        amount = act.amount;
       }
+
+      let id: number | undefined;
+      if (act.id !== undefined) {
+        const parsedId = Number(act.id);
+        if (Number.isInteger(parsedId) && parsedId >= 0) {
+          id = parsedId;
+        }
+      }
+
       const scrollAction: ScrollAction = {
         type: 'scroll',
         direction,
         amount,
+        ...(id !== undefined ? { id } : {}),
       };
       return { valid: true, action: scrollAction };
     }
